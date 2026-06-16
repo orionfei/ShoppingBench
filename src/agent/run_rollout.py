@@ -11,6 +11,7 @@ from tqdm import tqdm
 from toolkit import tools, toolmap
 from util.llm import ask_llm
 from util.message import Message, USER_ROLES, ASSISTANT_ROLES
+from util.history_compression import build_state_folded_user_prompt
 
 
 MAX_STEPS = 30
@@ -30,7 +31,7 @@ def get_system_prompt(config: dict) -> str:
     return prompt_template.replace("<|toolkit_description|>", toolkit_description)
 
 
-def get_user_prompt(message: Message, history_messages: list[str]) -> str:
+def get_user_prompt(message: Message, history_messages: list[str], config: dict | None = None) -> str:
     user_message = message.to_string(USER_ROLES)
     if user_message:
         history_messages.append(user_message)
@@ -38,6 +39,13 @@ def get_user_prompt(message: Message, history_messages: list[str]) -> str:
     assistant_message = message.to_string(ASSISTANT_ROLES)
     if assistant_message:
         history_messages.append(assistant_message)
+
+    config = config or {}
+    if config.get("history_compression") == "state_folded":
+        return build_state_folded_user_prompt(
+            history_messages,
+            max_candidates_per_search=config.get("state_max_candidates_per_search", 10),
+        )
 
     history = "\n\n".join(history_messages)
     return f"# Dialogue Records History\n{history}"
@@ -91,7 +99,7 @@ def react_loop(query: str, config: dict):
     system_prompt = get_system_prompt(config)
     #print(f"System Prompt:\n{system_prompt}")
     for step in range(1, MAX_STEPS + 1):
-        user_prompt = get_user_prompt(message, history_messages)
+        user_prompt = get_user_prompt(message, history_messages, config)
         message.clear()
         reasoning_content, content, message = think(
             system_prompt=system_prompt,
@@ -118,6 +126,7 @@ def react_loop(query: str, config: dict):
                     "step": step,
                     "query": query,
                     "timestamp": int(time.time() * 1000),
+                    "history_compression": config.get("history_compression", "raw"),
                 },
             }
         )
