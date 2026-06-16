@@ -1,13 +1,18 @@
 indexes/*
 indexes
+indexes/
 logs/*
 logs
+logs/
 log/*
 log
 log*
+server.log
+server*.log
 .DS_Store
 *__pycache__
 __pycache__/
+*.pyc
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -28,6 +33,8 @@ model
 # Local environment and credentials
 .env
 .env.*
+.venv/
+.jdk/
 *.pem
 *.key
 *.crt
@@ -43,19 +50,19 @@ Qwen3-Embedding-0.6B/
 *.ckpt
 *.onnx
 
-# Generated search indexes and local servers
-indexes/
-server.log
-
 # Generated / temporary datasets and experiment outputs
 data/*
 !data/synthesize_voucher_train_plan.jsonl
 !data/synthesize_voucher_train.jsonl
 !data/synthesize_voucher_test.jsonl
+data/rollout*.jsonl
+data/smoke*.jsonl
 data/tmp/
 data/tmp_*
 config/tmp/
 resources/*.jsonl
+resources/documents.jsonl
+resources/documents.jsonl.gz
 documents.jsonl
 documents.jsonl.gz
 *.jsonl.before_manual_fix
