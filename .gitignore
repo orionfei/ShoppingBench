@@ -7,6 +7,11 @@ log
 log*
 .DS_Store
 *__pycache__
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
 submit/*
 submit
 model/*
@@ -19,3 +24,47 @@ model
 *outputs
 *.log
 *run_tool.py
+
+# Local environment and credentials
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Local models and checkpoints
+Qwen3-Embedding-0.6B/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Generated search indexes and local servers
+indexes/
+server.log
+
+# Generated / temporary datasets and experiment outputs
+data/*
+!data/synthesize_voucher_train_plan.jsonl
+!data/synthesize_voucher_train.jsonl
+data/tmp/
+data/tmp_*
+config/tmp/
+resources/*.jsonl
+documents.jsonl
+documents.jsonl.gz
+*.jsonl.before_manual_fix
+*.meta.jsonl
+
+# Local databases and binary caches
+*.db
+*.sqlite
+*.sqlite3
+*.npy
+*.npz
+*.faiss
+*.index
