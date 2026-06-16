@@ -13,7 +13,7 @@ print("Load indexes done.", file=sys.stderr)
 app = Flask(__name__)
 
 
-CAPACITY = 100000
+CAPACITY = int(os.getenv("SHOPPINGBENCH_SEARCH_CAPACITY", "100000"))
 PAGE_SIZE = 10
 MAX_PAGE = 5
 SEARCH_FIELDS = ["product_id", "shop_id", "title", "price", "service", "sold_count"]

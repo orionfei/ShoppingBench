@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 from urllib.parse import quote_plus
@@ -7,9 +8,9 @@ import requests
 from .base import BaseTool
 
 
-TIMEOUT = 60
+TIMEOUT = int(os.getenv("SHOPPINGBENCH_TOOL_TIMEOUT", "60"))
 
-MAX_RETRIES = 10
+MAX_RETRIES = int(os.getenv("SHOPPINGBENCH_TOOL_MAX_RETRIES", "10"))
 
 DESC = """Search for products and return up to 10 products, with each product including a product_id, shop_id, title, price, service, and sold_count."""
 
@@ -104,8 +105,10 @@ class FindProduct(BaseTool):
         url = "http://127.0.0.1:5631/find_product?"
         url += "&".join("{}={}".format(str(k), str(v)) for k, v in params.items())
 
-        # request
-        return requests.get(url, timeout=TIMEOUT)
+        # request local sandbox directly; environment proxies can break 127.0.0.1.
+        session = requests.Session()
+        session.trust_env = False
+        return session.get(url, timeout=TIMEOUT)
 
     def _parse_response(self, response):
         return response.json()

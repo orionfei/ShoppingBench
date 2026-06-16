@@ -1,20 +1,34 @@
 import os
 import time
 import logging
+from urllib.parse import urlparse
 
+import httpx
 from openai import OpenAI
 
 
 MAX_RETRIES = 10
+TIMEOUT = float(os.getenv("SHOPPINGBENCH_LLM_TIMEOUT", "180"))
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger()
 
 
+def should_bypass_env_proxy(base_url: str | None, model_config: dict | None = None) -> bool:
+    model = (model_config or {}).get("model", "")
+    if isinstance(model, str) and model.startswith("mimo"):
+        return True
+
+    if not base_url:
+        return False
+
+    hostname = (urlparse(base_url).hostname or "").lower()
+    return hostname in {"127.0.0.1", "localhost", "0.0.0.0", "::1"} or "mimo" in hostname
+
+
 def chat_completion_stream(client: OpenAI, messages: list[dict[str, str]], model_config: dict):
     stream = client.chat.completions.create(
         messages=messages,
-        extra_headers={"Accept": "text/event-stream"},
         **model_config,
     )
 
@@ -36,7 +50,6 @@ def chat_completion_stream(client: OpenAI, messages: list[dict[str, str]], model
 def chat_completion(client: OpenAI, messages: list[dict[str, str]], model_config: dict):
     completion = client.chat.completions.create(
         messages=messages,
-        extra_headers={"Accept": "text/event-stream"},
         **model_config,
     )
 
@@ -61,11 +74,28 @@ def ask_llm(
     api_key: str = None,
 ) -> tuple[str, str]:
     success = False
+    model = model_config.get("model", "")
+    is_mimo_model = isinstance(model, str) and model.startswith("mimo")
+    resolved_base_url = base_url if base_url else (
+        os.environ.get("MIMO_BASE_URL") if is_mimo_model else os.environ.get("OPENAI_BASE_URL")
+    )
+    resolved_api_key = api_key if api_key else (
+        os.environ.get("MIMO_API_KEY") if is_mimo_model else os.environ.get("OPENAI_API_KEY")
+    )
+
     for i in range(MAX_RETRIES):
+        client = None
         try:
+            http_client = (
+                httpx.Client(trust_env=False)
+                if should_bypass_env_proxy(resolved_base_url, model_config)
+                else None
+            )
             client = OpenAI(
-                base_url=base_url if base_url else os.environ.get("OPENAI_BASE_URL"),
-                api_key=api_key if api_key else os.environ.get("OPENAI_API_KEY"),
+                base_url=resolved_base_url,
+                api_key=resolved_api_key,
+                http_client=http_client,
+                timeout=TIMEOUT,
             )
 
             if model_config.get("stream", False):
@@ -86,7 +116,8 @@ def ask_llm(
             logger.error(f"Error occurred: {e}. Retry {i+1}/{MAX_RETRIES}.")
             time.sleep(3)
         finally:
-            client.close()
+            if client is not None:
+                client.close()
 
     if not success:
         logger.error(f"Retry {MAX_RETRIES} but can't success!")

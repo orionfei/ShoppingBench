@@ -22,6 +22,10 @@ enc = tiktoken.encoding_for_model("gpt-4o")
 
 
 def print_data_insight(samples: list[dict]):
+    if not samples:
+        print("#Samples: 0")
+        return
+
     instruction_tokens = []
     input_tokens = []
     output_tokens = []

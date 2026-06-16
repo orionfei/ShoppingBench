@@ -9,6 +9,7 @@ toolkit = [
     FindProduct,
     ViewProductInformation,
     RecommendProduct,
+    PythonExecute,
     Terminate,
     WebSearch,
 ]

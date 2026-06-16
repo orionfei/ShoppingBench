@@ -51,6 +51,7 @@ server.log
 data/*
 !data/synthesize_voucher_train_plan.jsonl
 !data/synthesize_voucher_train.jsonl
+!data/synthesize_voucher_test.jsonl
 data/tmp/
 data/tmp_*
 config/tmp/

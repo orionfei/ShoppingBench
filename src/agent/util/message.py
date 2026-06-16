@@ -1,6 +1,7 @@
 import re
 import hashlib
 import base64
+import json as std_json
 import ujson as json
 
 from pydantic import BaseModel
@@ -9,6 +10,27 @@ from pydantic import BaseModel
 USER_ROLES = ["user"]
 ASSISTANT_ROLES = ["think", "tool_call", "obs", "response"]
 OUTPUT_ROLES = ["think", "tool_call", "response"]
+
+
+def sanitize_role_content(content: str) -> str:
+    for role in USER_ROLES + ASSISTANT_ROLES:
+        content = content.replace(f"<{role}>", f"[{role}]")
+        content = content.replace(f"</{role}>", f"[/{role}]")
+    return content
+
+
+def extract_json_value(text: str):
+    decoder = std_json.JSONDecoder()
+    for start, ch in enumerate(text):
+        if ch not in "[{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(text[start:])
+        except ValueError:
+            continue
+        if isinstance(value, (dict, list)):
+            return value
+    return None
 
 
 def generate_tool_call_id(name: str, parameters: dict, length: int = 8) -> str:
@@ -49,7 +71,7 @@ class Message(BaseModel):
                 if isinstance(content, (dict, list)):
                     content = json.dumps(content)
                 elif isinstance(content, str):
-                    pass
+                    content = sanitize_role_content(content)
                 else:
                     raise Exception(
                         f"Invalid content type: {type(content)}, content: {content}"
@@ -75,6 +97,14 @@ class Message(BaseModel):
             matchobj = re.search(f"<{role}>(.+?)</{role}>", content, re.DOTALL)
             if matchobj:
                 tmp[role] = matchobj.group(1).strip()
+            elif role == "tool_call" and "<tool_call>" in content:
+                tool_call_str = content.split("<tool_call>", 1)[1].strip()
+                end = tool_call_str.find("</tool_call>")
+                if end >= 0:
+                    tool_call_str = tool_call_str[:end].strip()
+                json_array = extract_json_value(tool_call_str)
+                if isinstance(json_array, (dict, list)):
+                    tmp[role] = json.dumps(json_array)
         # think
         if not tmp.get("think") and reasoning_content:
             tmp["think"] = reasoning_content.replace("<think>", "").replace("</think>", "").strip()
@@ -93,6 +123,8 @@ class Message(BaseModel):
             except:
                 pass
             tmp["tool_call"] = tool_call
+            if tool_call:
+                tmp.pop("response", None)
         return clf(**tmp)
 
 

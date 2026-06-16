@@ -51,8 +51,10 @@ class ViewProductInformation(BaseTool):
         url = "http://127.0.0.1:5631/view_product_information?"
         url += "&".join("{}={}".format(str(k), str(v)) for k, v in params.items())
 
-        # request
-        return requests.get(url, timeout=TIMEOUT)
+        # request local sandbox directly; environment proxies can break 127.0.0.1.
+        session = requests.Session()
+        session.trust_env = False
+        return session.get(url, timeout=TIMEOUT)
 
     def _parse_response(self, response):
         return response.json()
