@@ -1,0 +1,17 @@
+{
+    "task": "voucher",
+    "system_prompt_file": "src/agent/prompt/rollout.md",
+    "synthesize_file": "data/mimo_voucher_15_by_difficulty.jsonl",
+    "rollout_file": "data/rollout_voucher_mimo_state_folded_15.jsonl",
+    "threads": 1,
+    "base_url": "https://api.xiaomimimo.com/v1",
+    "exclude_tools": ["web_search"],
+    "history_compression": "state_folded",
+    "state_max_candidates_per_search": 5,
+    "model_config": {
+        "model": "mimo-v2.5-pro-ultraspeed",
+        "temperature": 0,
+        "max_completion_tokens": 8192,
+        "stream": false
+    }
+}

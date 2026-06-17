@@ -150,6 +150,7 @@ Main fields:
     "scope": "platform | shop",
     "threshold": 102,
     "budget": 153,
+    "parse_ok": true,
     "discount": {
       "type": "fixed",
       "value": 15
@@ -173,6 +174,14 @@ Main fields:
       ]
     }
   ],
+  "budget_candidates": [
+    {
+      "product_id": "...",
+      "shop_id": "...",
+      "price": 166.0
+    }
+  ],
+  "requested_view_product_ids": ["..."],
   "selected_product_ids": ["..."],
   "selected_total_before_voucher": 166.0,
   "shop_anchor": "1222660",
@@ -187,18 +196,42 @@ Main fields:
     }
   ],
   "latest_budget_calculation": {},
+  "budget_calculation_trusted": true,
   "recommendations": [],
   "terminations": [],
   "pending": ["..."]
 }
 ```
 
+`pending` is not just a progress marker. It must inspect the result of the
+previous step. In particular:
+
+- if the latest budget calculation is `within_budget: false`, pending becomes
+  `revise_selection_or_fail`, not `recommend_products`
+- if the latest budget calculation is `within_budget: true` but product details
+  are missing, pending remains `verify_product_information`
+- only when the selected products have usable details and the latest budget
+  calculation passes should pending become `recommend_products`
+
+This avoids a training/inference mismatch where SFT teaches the model to revise
+over-budget selections, but online rollout state tells the model to recommend
+any selection that merely has a budget calculation.
+
 ## How Each Tool Is Folded
 
 ### `find_product`
 
 Raw observation can contain up to 10 products per search. The folded state keeps
-only a bounded candidate list:
+two compressed views:
+
+1. `searches[].candidates`: a bounded top-k readable list for product selection.
+   This keeps title/service information and is controlled by
+   `state_max_candidates_per_search`.
+2. `budget_candidates`: all observed search products reduced to
+   `product_id/shop_id/price`. This is intentionally not top-k truncated because
+   it is the evidence used to verify voucher and budget calculations.
+
+Example readable candidate state:
 
 ```json
 {
@@ -220,7 +253,8 @@ only a bounded candidate list:
 ```
 
 For shop vouchers, this preserves the `shop_id` needed to keep later searches
-inside the same shop.
+inside the same shop. For budget verification, `budget_candidates` is the
+source of truth for product prices and shop ids.
 
 ### `view_product_information`
 
@@ -258,6 +292,17 @@ The folded state keeps only the parsed calculation result when possible:
 ```
 
 It does not need to preserve the full Python code in the historical prompt.
+The parsed result is not trusted just because it is valid JSON. The online
+state builder cross-checks it against observed `budget_candidates` and the
+parsed voucher rules:
+
+- every `product_id` must exist in observed search candidates
+- every calculated `shop_id` must match the observed product `shop_id`
+- `total_before_voucher`, `voucher_used`, `payable_total`, `budget`, and
+  `within_budget` must match deterministic recomputation within one cent
+
+If any of those checks fail, `budget_calculation_trusted` is false and the
+state does not advance to `recommend_products`.
 
 ### `recommend_product`
 
@@ -401,7 +446,7 @@ Tested on 10 Voucher/Budget trajectories covering:
 - one to four products
 - same-shop constraints
 
-### Online state folding, top 10 candidates
+### Earlier online state folding, top 10 candidates
 
 ```text
 full prompt chars:          189,533
@@ -412,17 +457,34 @@ relative to full:    17.79% char saving
 relative to compact:  5.03% char saving
 ```
 
-This is safe but not aggressive enough.
+This was an earlier conservative diagnostic. The current recommended setting is
+the stricter top-5 state folding below, which keeps full `budget_candidates` for
+budget verification while truncating only the readable candidate list.
 
-### Online state folding, top 5 candidates
+### Current safe online state folding, top 5 candidates
+
+These numbers count only the user/history prompt, because that is the part
+changed by history compression:
 
 ```text
-full prompt chars:              189,533
-compact prompt chars:           164,052
-online folded top5 prompt chars:101,824
+full history chars:              189,533
+field-pruned history chars:      164,052
+safe state-folded top5 chars:    135,541
 
-relative to full:    46.28% char saving
-relative to compact: 37.93% char saving
+relative to full history:         28.49% char saving
+relative to field-pruned history: 17.38% char saving
+```
+
+If the fixed system prompt and tool descriptions are included, the same files
+measure:
+
+```text
+full total prompt chars:          400,433
+field-pruned total prompt chars:  374,952
+safe state-folded top5 total:     346,441
+
+relative to full total prompt:    13.49% char saving
+relative to field-pruned total:    7.60% char saving
 ```
 
 Replay support checks:
@@ -443,6 +505,42 @@ price match score: 1.000
 service match score: 1.000
 sku & attrs match score: 1.000
 rule match score: 1.000
+budget match score: 1.000
+```
+
+### Post-fix adversarial validation
+
+An adversarial subagent found two P1 issues in the first state-folded version:
+
+- a structurally valid but numerically wrong `python_execute` JSON could become
+  trusted
+- a shop voucher calculation could forge `shop_ids` and falsely make a mixed
+  shop selection look same-shop
+
+The online compressor now rejects both cases by recomputing the budget from
+observed product prices and shop ids. Synthetic checks confirm:
+
+```text
+wrong budget JSON trusted: false
+forged shop_id JSON trusted: false
+```
+
+The parser was also tightened to parse voucher terms from the voucher section,
+not from arbitrary product text. Current template coverage:
+
+```text
+synthesize_voucher_train.jsonl:      750/750 parse_ok
+synthesize_voucher_test.jsonl:       250/250 parse_ok
+synthesize_voucher_train_plan.jsonl: 750/750 parse_ok
+```
+
+The stricter trust logic was replayed on the six real-code gold trajectories:
+
+```text
+support_all_ok: true
+trusted_state_steps: 6
+gt rate: 1.000
+success rate: 1.000
 budget match score: 1.000
 ```
 
@@ -530,3 +628,35 @@ Compress historical evidence into typed state; do not compress the current actio
 
 The model should still learn and produce the normal tool-call protocol. Only
 the old context is folded.
+
+## Review Notes
+
+Several correctness risks were reviewed after the first online implementation:
+
+- `view_product_information` is not treated as selection anymore. Viewed
+  products are only verified candidates. `selected_product_ids` now comes from
+  `python_execute` budget observations or `recommend_product`.
+- Price and shop recovery no longer depends only on retained top-k search
+  candidates. If `python_execute` returns `product_ids`, `shop_ids`,
+  `total_before_voucher`, or `payable_total`, those values are accepted only
+  after deterministic recomputation against observed `budget_candidates`.
+- Shop voucher applicability requires complete shop information when it is
+  inferred locally. This avoids falsely marking a mixed-shop selection as
+  same-shop when some shop ids were missing due to candidate truncation.
+- The online state now records `voucher.parse_ok` so downstream prompts can
+  distinguish a parsed voucher from a failed regex parse.
+- Duplicate `tool_call_id` observations are handled defensively by keeping the
+  first observation for a call id instead of silently overwriting it.
+
+Not adopted for now:
+
+- Adding full price/shop fields to `view_product_information`. The current
+  local search server does not return those fields, and changing the tool schema
+  would expand every view observation. Budget state should instead come from
+  search candidates or `python_execute`.
+- Keeping a full history of budget calculations. This would increase context;
+  the folded state keeps only the latest calculation plus `pending`, which is
+  enough for the current decision.
+- Keeping multiple versions of repeated `view_product_information` results for
+  the same product. Later observations overwrite earlier ones; this is acceptable
+  for static ShoppingBench product data and saves context.
