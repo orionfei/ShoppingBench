@@ -80,10 +80,74 @@ def state_candidate_ids(state: dict) -> set[str]:
         for candidate in search.get("candidates") or []:
             if candidate.get("product_id"):
                 ids.add(str(candidate["product_id"]))
+    for candidate in state.get("budget_candidates") or []:
+        if candidate.get("product_id"):
+            ids.add(str(candidate["product_id"]))
     for product in state.get("viewed_products") or []:
         if product.get("product_id"):
             ids.add(str(product["product_id"]))
     return ids
+
+
+def state_budget_input_ids(state: dict) -> set[str]:
+    ids = set()
+    for candidate in state.get("budget_candidates") or []:
+        if (
+            candidate.get("product_id")
+            and candidate.get("price") is not None
+            and candidate.get("shop_id") is not None
+        ):
+            ids.add(str(candidate["product_id"]))
+    for search in state.get("searches") or []:
+        for candidate in search.get("candidates") or []:
+            if (
+                candidate.get("product_id")
+                and candidate.get("price") is not None
+                and candidate.get("shop_id") is not None
+            ):
+                ids.add(str(candidate["product_id"]))
+    return ids
+
+
+def product_ids_in_code(code: str) -> set[str]:
+    if not isinstance(code, str):
+        return set()
+    return set(
+        re.findall(
+            r"""["']product_id["']\s*:\s*["'](\d{6,})["']""",
+            code,
+        )
+    )
+
+
+def state_invariant_checks(state: dict) -> list[dict]:
+    checks = []
+    latest_calc = state.get("latest_budget_calculation")
+    selected_ids = [str(pid) for pid in state.get("selected_product_ids") or []]
+    if state.get("budget_calculation_trusted") and isinstance(latest_calc, dict):
+        calc_ids = [str(pid) for pid in latest_calc.get("product_ids") or []]
+        checks.append(
+            {
+                "tool": "state",
+                "field": "active_selection_matches_latest_budget",
+                "ok": selected_ids == calc_ids,
+            }
+        )
+    if state.get("voucher", {}).get("scope") == "shop" and state.get("shop_anchor"):
+        known_shop_ids = {
+            str(candidate.get("shop_id"))
+            for candidate in state.get("budget_candidates") or []
+            if str(candidate.get("product_id")) in selected_ids
+            and candidate.get("shop_id") is not None
+        }
+        checks.append(
+            {
+                "tool": "state",
+                "field": "shop_anchor_matches_selected_shops",
+                "ok": len(known_shop_ids) == 1 and state["shop_anchor"] in known_shop_ids,
+            }
+        )
+    return checks
 
 
 def check_action_supported_by_state(prompt: str, message: Message) -> dict:
@@ -92,7 +156,16 @@ def check_action_supported_by_state(prompt: str, message: Message) -> dict:
         return {"has_state": False, "checks": [], "ok": True}
 
     candidate_ids = state_candidate_ids(state)
+    budget_input_ids = state_budget_input_ids(state)
     checks = []
+    checks.extend(state_invariant_checks(state))
+    checks.append(
+        {
+            "tool": "state",
+            "field": "voucher_parse_ok",
+            "ok": state.get("voucher", {}).get("parse_ok") is True,
+        }
+    )
     for call in message.tool_call or []:
         name = call.get("name")
         params = call.get("parameters", {}) or {}
@@ -125,11 +198,21 @@ def check_action_supported_by_state(prompt: str, message: Message) -> dict:
                 }
             )
         elif name == "python_execute":
+            code_ids = product_ids_in_code(params.get("code", ""))
+            requested_or_selected_ids = set(state.get("selected_product_ids") or [])
+            requested_or_selected_ids.update(state.get("requested_view_product_ids") or [])
+            budget_ids_to_check = code_ids or requested_or_selected_ids
             checks.append(
                 {
                     "tool": name,
                     "field": "budget_inputs",
-                    "ok": bool(candidate_ids) and bool(state.get("voucher")),
+                    "value": sorted(budget_ids_to_check),
+                    "ok": bool(budget_input_ids)
+                    and bool(state.get("voucher"))
+                    and (
+                        not budget_ids_to_check
+                        or set(budget_ids_to_check).issubset(budget_input_ids)
+                    ),
                 }
             )
     return {"has_state": True, "checks": checks, "ok": all(item["ok"] for item in checks)}

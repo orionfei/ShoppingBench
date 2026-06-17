@@ -152,7 +152,8 @@ def producer(queue: mp.Queue, config: dict):
                 had_queries.add(query)
             portalocker.unlock(fin)
 
-    total = int(os.popen(f"wc -l {config['synthesize_file']}").read().strip().split(" ", 1)[0])
+    with open(config["synthesize_file"], "r") as fin:
+        total = sum(1 for _ in fin)
     pbar = tqdm(total=total - len(had_queries), desc="Start rolling out the remaining queries: ")
     with open(config["synthesize_file"], "r") as fin:
         for line in fin:
