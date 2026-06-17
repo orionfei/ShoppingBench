@@ -1,0 +1,12 @@
+{
+    "task": "product",
+    "system_prompt_file": "src/agent/prompt/rollout.md",
+    "synthesize_file": "data/smoke_product_test.jsonl",
+    "rollout_file": "data/smoke_rollout_product_bailian_deepseek-v4-flash.jsonl",
+    "threads": 1,
+    "model_config": {
+        "model": "bailian/deepseek-v4-flash",
+        "temperature": 0,
+        "max_tokens": 8192
+    }
+}

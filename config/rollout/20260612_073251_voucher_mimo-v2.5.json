@@ -1,0 +1,12 @@
+{
+    "task": "voucher",
+    "system_prompt_file": "src/agent/prompt/rollout.md",
+    "synthesize_file": "data/20260612_073251_voucher_test.jsonl",
+    "rollout_file": "data/20260612_073251_rollout_voucher_mimo-v2.5.jsonl",
+    "threads": 12,
+    "model_config": {
+        "model": "mimo-v2.5",
+        "temperature": 0,
+        "max_completion_tokens": 8192
+    }
+}

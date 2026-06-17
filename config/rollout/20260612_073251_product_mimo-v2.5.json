@@ -1,0 +1,12 @@
+{
+    "task": "product",
+    "system_prompt_file": "src/agent/prompt/rollout.md",
+    "synthesize_file": "data/20260612_073251_product_test.jsonl",
+    "rollout_file": "data/20260612_073251_rollout_product_mimo-v2.5.jsonl",
+    "threads": 12,
+    "model_config": {
+        "model": "mimo-v2.5",
+        "temperature": 0,
+        "max_completion_tokens": 8192
+    }
+}
