@@ -112,6 +112,47 @@ def _slim_find_product(product: dict) -> dict:
     }
 
 
+def _candidate_product_id(product: dict) -> str | None:
+    if not isinstance(product, dict) or not product.get("product_id"):
+        return None
+    return str(product["product_id"])
+
+
+def _focused_search_candidates(
+    products: list[dict],
+    max_candidates_per_search: int,
+    focus_shop_ids: set[str],
+    extra_focus_candidates: int = 3,
+) -> list[dict]:
+    """Keep top search hits plus a few same-shop candidates needed for voucher decisions."""
+    candidates = []
+    seen_ids = set()
+    for product in products[:max_candidates_per_search]:
+        product_id = _candidate_product_id(product)
+        if not product_id:
+            continue
+        candidates.append(_slim_find_product(product))
+        seen_ids.add(product_id)
+
+    if not focus_shop_ids:
+        return candidates
+
+    extra_count = 0
+    for product in products[max_candidates_per_search:]:
+        product_id = _candidate_product_id(product)
+        if not product_id or product_id in seen_ids:
+            continue
+        shop_id = product.get("shop_id")
+        if shop_id is None or str(shop_id) not in focus_shop_ids:
+            continue
+        candidates.append(_slim_find_product(product))
+        seen_ids.add(product_id)
+        extra_count += 1
+        if extra_count >= extra_focus_candidates:
+            break
+    return candidates
+
+
 def _budget_candidate(product: dict) -> dict:
     return {
         key: product[key]
@@ -300,6 +341,8 @@ def build_state_from_history(
     terminations = []
     budget_candidates = []
     budget_candidate_ids = set()
+    budget_candidate_by_id = {}
+    focus_shop_ids = set()
 
     for step_no, item in enumerate(history_messages, 1):
         calls = _json_role_value(item, "tool_call") or []
@@ -327,20 +370,25 @@ def build_state_from_history(
                     if product_id in budget_candidate_ids:
                         continue
                     budget_candidate_ids.add(product_id)
-                    budget_candidates.append(_budget_candidate(product))
+                    candidate = _budget_candidate(product)
+                    budget_candidates.append(candidate)
+                    budget_candidate_by_id[product_id] = candidate
                 search_params = {
                     key: params[key]
                     for key in ("q", "page", "shop_id", "price", "sort", "service")
                     if key in params and params[key] not in (None, "", "default")
                 }
+                search_focus_shop_ids = set(focus_shop_ids)
+                if search_params.get("shop_id") is not None:
+                    search_focus_shop_ids.add(str(search_params["shop_id"]))
                 searches.append(
                     {
                         "parameters": search_params,
-                        "candidates": [
-                            _slim_find_product(product)
-                            for product in products[:max_candidates_per_search]
-                            if isinstance(product, dict)
-                        ],
+                        "candidates": _focused_search_candidates(
+                            products,
+                            max_candidates_per_search,
+                            search_focus_shop_ids,
+                        ),
                     }
                 )
             elif name == "view_product_information":
@@ -348,6 +396,10 @@ def build_state_from_history(
                 requested_view_product_ids.extend(
                     pid for pid in ids if pid not in requested_view_product_ids
                 )
+                for pid in ids:
+                    candidate = budget_candidate_by_id.get(str(pid))
+                    if candidate and candidate.get("shop_id") is not None:
+                        focus_shop_ids.add(str(candidate["shop_id"]))
                 if isinstance(results, list):
                     for product in results:
                         if isinstance(product, dict) and product.get("product_id"):

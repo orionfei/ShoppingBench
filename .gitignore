@@ -33,6 +33,7 @@ model
 # Local environment and credentials
 .env
 .env.*
+!src/sft/LLaMA-Factory/.env.local
 .venv/
 .jdk/
 *.pem
@@ -42,19 +43,30 @@ model
 *.pfx
 
 # Local models and checkpoints
-Qwen3-Embedding-0.6B/
+/Qwen3-Embedding-0.6B/
+/models/
 *.safetensors
 *.bin
 *.pt
 *.pth
 *.ckpt
 *.onnx
+*.gguf
+*.msgpack
+*.h5
 
 # Generated / temporary datasets and experiment outputs
 data/*
 !data/synthesize_voucher_train_plan.jsonl
 !data/synthesize_voucher_train.jsonl
 !data/synthesize_voucher_test.jsonl
+!data/teacher_voucher_train_clean691_state_folded.jsonl
+!data/teacher_voucher_train_clean691_synthesize.jsonl
+!data/teacher_voucher_train_clean691_sft.json
+!data/teacher_voucher_train_clean691_report.json
+!data/teacher_voucher_train_clean691_final_audit.json
+!data/teacher_voucher_train_clean691_deep_audit.json
+!data/teacher_voucher_train_clean691_sft_report.json
 data/rollout*.jsonl
 data/smoke*.jsonl
 data/tmp/
@@ -65,7 +77,7 @@ resources/documents.jsonl
 resources/documents.jsonl.gz
 documents.jsonl
 documents.jsonl.gz
-*.jsonl.before_manual_fix
+*.jsonl.before_*
 *.meta.jsonl
 
 # Local databases and binary caches
