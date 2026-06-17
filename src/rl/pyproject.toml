@@ -36,6 +36,8 @@ dependencies = [
     "dill",
     "hydra-core",
     "numpy",
+    "pandas",
+    "pyarrow",
     "pybind11",
     "ray",
     "tensordict",

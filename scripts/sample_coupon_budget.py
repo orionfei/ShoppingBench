@@ -148,9 +148,10 @@ def expand_quota(quotas: dict):
     return values
 
 
-def build_sampling_specs(total: int):
+def build_sampling_specs(total: int, voucher_type_weights: dict | None = None):
+    voucher_type_weights = voucher_type_weights or VOUCHER_TYPE_WEIGHTS
     product_counts = expand_quota(largest_remainder_quota(total, PRODUCT_COUNT_WEIGHTS))
-    voucher_types = expand_quota(largest_remainder_quota(total, VOUCHER_TYPE_WEIGHTS))
+    voucher_types = expand_quota(largest_remainder_quota(total, voucher_type_weights))
     discount_types = expand_quota(largest_remainder_quota(total, DISCOUNT_TYPE_WEIGHTS))
     style_buckets = expand_quota(largest_remainder_quota(total, STYLE_BUCKET_WEIGHTS))
     threshold_buckets = expand_quota(
@@ -184,11 +185,11 @@ def build_sampling_specs(total: int):
                 "style_bucket": style_buckets[idx],
             }
         )
-    return rebalance_voucher_types(specs, total)
+    return rebalance_voucher_types(specs, total, voucher_type_weights)
 
 
-def rebalance_voucher_types(specs: list[dict], total: int):
-    target = largest_remainder_quota(total, VOUCHER_TYPE_WEIGHTS)
+def rebalance_voucher_types(specs: list[dict], total: int, voucher_type_weights: dict | None = None):
+    target = largest_remainder_quota(total, voucher_type_weights or VOUCHER_TYPE_WEIGHTS)
     counts = Counter(spec["voucher_type"] for spec in specs)
     platform_extra = counts["platform"] - target["platform"]
     if platform_extra <= 0:
@@ -555,7 +556,7 @@ def generate_plan(args):
     if len(products) < 4:
         raise ValueError("Not enough products loaded for voucher sampling.")
 
-    specs = build_sampling_specs(args.total)
+    specs = build_sampling_specs(args.total, parse_voucher_type_weights(args.voucher_type_weights))
     total_sampled_products = sum(spec["n_products"] for spec in specs)
     title_only_limit = math.ceil(total_sampled_products * args.max_title_only_product_ratio)
     title_only_count = 0
@@ -609,6 +610,26 @@ def validate_plan(rows: list[dict]):
     used = set()
     for row in rows:
         validate_plan_item(row, used)
+
+
+def parse_voucher_type_weights(raw: str):
+    weights = {}
+    for part in raw.split(","):
+        if not part.strip():
+            continue
+        key, sep, value = part.partition("=")
+        if not sep:
+            raise ValueError(f"Invalid voucher type weight item: {part!r}")
+        key = key.strip()
+        if key not in {"platform", "shop"}:
+            raise ValueError(f"Invalid voucher type: {key!r}")
+        weights[key] = float(value)
+    if set(weights) != {"platform", "shop"}:
+        raise ValueError("--voucher-type-weights must include platform and shop.")
+    if any(value < 0 for value in weights.values()) or sum(weights.values()) <= 0:
+        raise ValueError("--voucher-type-weights values must be non-negative and sum positive.")
+    total = sum(weights.values())
+    return {key: value / total for key, value in weights.items()}
 
 
 def load_jsonl(path: Path):
@@ -823,6 +844,7 @@ def parse_args():
     parser.add_argument("--metadata-output", default=None)
     parser.add_argument("--total", type=int, default=750)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--voucher-type-weights", default="platform=0.40,shop=0.60")
     parser.add_argument("--max-docs", type=int, default=100000)
     parser.add_argument("--max-attempts-per-item", type=int, default=1000)
     parser.add_argument("--max-title-only-product-ratio", type=float, default=0.10)

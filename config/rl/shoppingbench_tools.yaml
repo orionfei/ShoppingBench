@@ -1,0 +1,76 @@
+tools:
+  - class_name: verl.tools.shoppingbench_tools.ShoppingBenchFindProductTool
+    config:
+      type: native
+      base_url: http://127.0.0.1:5631
+      timeout: 60
+    tool_schema:
+      type: function
+      function:
+        name: find_product
+        description: Search for products and return up to 10 candidates.
+        parameters:
+          type: object
+          properties:
+            q: {type: string, description: Search query}
+            page: {type: integer, description: Page number}
+            shop_id: {type: string, description: Optional shop id}
+            price: {type: string, description: Optional price range}
+            sort: {type: string, description: Optional sort mode}
+            service: {type: string, description: Optional service filter}
+          required: [q, page]
+  - class_name: verl.tools.shoppingbench_tools.ShoppingBenchViewProductInformationTool
+    config:
+      type: native
+      base_url: http://127.0.0.1:5631
+      timeout: 60
+    tool_schema:
+      type: function
+      function:
+        name: view_product_information
+        description: Fetch product details for product ids.
+        parameters:
+          type: object
+          properties:
+            product_ids: {type: string, description: Comma-separated product ids}
+          required: [product_ids]
+  - class_name: verl.tools.shoppingbench_tools.ShoppingBenchRecommendProductTool
+    config:
+      type: native
+    tool_schema:
+      type: function
+      function:
+        name: recommend_product
+        description: Recommend products to the user.
+        parameters:
+          type: object
+          properties:
+            product_ids: {type: string, description: Comma-separated product ids}
+          required: [product_ids]
+  - class_name: verl.tools.shoppingbench_tools.ShoppingBenchTerminateTool
+    config:
+      type: native
+    tool_schema:
+      type: function
+      function:
+        name: terminate
+        description: End the interaction.
+        parameters:
+          type: object
+          properties:
+            status: {type: string, description: success or failure}
+          required: [status]
+  - class_name: verl.tools.shoppingbench_tools.ShoppingBenchPythonExecuteTool
+    config:
+      type: native
+      timeout: 20
+    tool_schema:
+      type: function
+      function:
+        name: python_execute
+        description: Execute Python code.
+        parameters:
+          type: object
+          properties:
+            code: {type: string, description: Python code}
+          required: [code]

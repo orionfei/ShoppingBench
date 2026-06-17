@@ -14,7 +14,7 @@
 # from . import gsm8k, math, prime_math, prime_code
 
 from verl.utils.import_utils import deprecated
-from verl.utils.reward_score import shoppingbench_toolrl
+from verl.utils.reward_score import shoppingbench_query, shoppingbench_toolrl
 
 def default_compute_score(
     data_source,
@@ -105,6 +105,8 @@ def default_compute_score(
     elif data_source == "shoppingbench":
         # from . import shoppingbench_toolrl
         res = shoppingbench_toolrl.compute_score(solution_str, ground_truth)
+    elif data_source == "shoppingbench_query":
+        res = shoppingbench_query.compute_score(solution_str, ground_truth, extra_info=extra_info)
         
     else:
         raise NotImplementedError(f"Reward function is not implemented for {data_source=}")

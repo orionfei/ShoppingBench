@@ -1,0 +1,45 @@
+{
+  "source": "data/rl_voucher_queries_750.jsonl",
+  "rows": 750,
+  "kept": 750,
+  "train": 675,
+  "test": 75,
+  "max_length": 4096,
+  "product_cache": "dataset/shoppingbench_query/product_cache.json",
+  "source_distribution": {
+    "voucher_type": {
+      "platform": 225,
+      "shop": 525
+    },
+    "product_count": {
+      "1": 61,
+      "3": 252,
+      "4": 209,
+      "2": 228
+    }
+  },
+  "train_distribution": {
+    "voucher_type": {
+      "shop": 472,
+      "platform": 203
+    },
+    "product_count": {
+      "3": 227,
+      "4": 188,
+      "1": 55,
+      "2": 205
+    }
+  },
+  "test_distribution": {
+    "voucher_type": {
+      "shop": 53,
+      "platform": 22
+    },
+    "product_count": {
+      "4": 21,
+      "2": 23,
+      "1": 6,
+      "3": 25
+    }
+  }
+}

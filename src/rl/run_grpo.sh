@@ -8,8 +8,29 @@ if [ -z "$MODEL_PATH" ]; then
     exit 1
 fi
 
-TRAIN_FILES="${TRAIN_FILES:-dataset/shoppingbench/train.parquet}"
-VAL_FILES="${VAL_FILES:-dataset/shoppingbench/test.parquet}"
+QUERY_LEVEL_RL="${QUERY_LEVEL_RL:-0}"
+if [ "$QUERY_LEVEL_RL" = "1" ]; then
+    TRAIN_FILES="${TRAIN_FILES:-dataset/shoppingbench_query/train.parquet}"
+    VAL_FILES="${VAL_FILES:-dataset/shoppingbench_query/test.parquet}"
+    SHOPPINGBENCH_PRODUCT_CACHE="${SHOPPINGBENCH_PRODUCT_CACHE:-dataset/shoppingbench_query/product_cache.json}"
+    ROLLOUT_MODE="${ROLLOUT_MODE:-async}"
+    ROLLOUT_NAME="${ROLLOUT_NAME:-vllm}"
+    MULTI_TURN_ENABLE="${MULTI_TURN_ENABLE:-True}"
+    MULTI_TURN_FORMAT="${MULTI_TURN_FORMAT:-shoppingbench_xml}"
+    MULTI_TURN_TOOL_CONFIG_PATH="${MULTI_TURN_TOOL_CONFIG_PATH:-config/rl/shoppingbench_tools.yaml}"
+    RETURN_RAW_CHAT="${RETURN_RAW_CHAT:-True}"
+    MAX_RESPONSE_LENGTH="${MAX_RESPONSE_LENGTH:-4096}"
+else
+    TRAIN_FILES="${TRAIN_FILES:-dataset/shoppingbench/train.parquet}"
+    VAL_FILES="${VAL_FILES:-dataset/shoppingbench/test.parquet}"
+    ROLLOUT_MODE="${ROLLOUT_MODE:-sync}"
+    ROLLOUT_NAME="${ROLLOUT_NAME:-vllm}"
+    MULTI_TURN_ENABLE="${MULTI_TURN_ENABLE:-False}"
+    MULTI_TURN_FORMAT="${MULTI_TURN_FORMAT:-hermes}"
+    MULTI_TURN_TOOL_CONFIG_PATH="${MULTI_TURN_TOOL_CONFIG_PATH:-null}"
+    RETURN_RAW_CHAT="${RETURN_RAW_CHAT:-False}"
+fi
+export SHOPPINGBENCH_PRODUCT_CACHE
 TRAIN_BATCH_SIZE="${TRAIN_BATCH_SIZE:-16}"
 VAL_BATCH_SIZE="${VAL_BATCH_SIZE:-16}"
 MAX_PROMPT_LENGTH="${MAX_PROMPT_LENGTH:-4096}"
@@ -40,6 +61,7 @@ python3 -m verl.trainer.main_ppo \
     data.val_batch_size=$VAL_BATCH_SIZE \
     data.max_prompt_length=$MAX_PROMPT_LENGTH \
     data.max_response_length=$MAX_RESPONSE_LENGTH \
+    data.return_raw_chat=$RETURN_RAW_CHAT \
     actor_rollout_ref.model.path=$MODEL_PATH \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.model.trust_remote_code=True \
@@ -53,7 +75,8 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
     actor_rollout_ref.actor.optim.lr=$LEARNING_RATE \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=$LOG_PROB_MICRO_BATCH_SIZE_PER_GPU \
-    actor_rollout_ref.rollout.name=vllm \
+    actor_rollout_ref.rollout.name=$ROLLOUT_NAME \
+    actor_rollout_ref.rollout.mode=$ROLLOUT_MODE \
     actor_rollout_ref.rollout.temperature=$ROLLOUT_TEMPERATURE \
     actor_rollout_ref.rollout.top_p=$ROLLOUT_TOP_P \
     actor_rollout_ref.rollout.dtype=bfloat16 \
@@ -62,6 +85,9 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.max_num_batched_tokens=$ROLLOUT_MAX_NUM_BATCHED_TOKENS \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$LOG_PROB_MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.rollout.n=$ROLLOUT_N \
+    actor_rollout_ref.rollout.multi_turn.enable=$MULTI_TURN_ENABLE \
+    actor_rollout_ref.rollout.multi_turn.format=$MULTI_TURN_FORMAT \
+    actor_rollout_ref.rollout.multi_turn.tool_config_path=$MULTI_TURN_TOOL_CONFIG_PATH \
     algorithm.kl_ctrl.kl_coef=0.001 \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \

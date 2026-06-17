@@ -87,6 +87,37 @@ class HermesToolParser(ToolParser):
         return function_calls
 
 
+class ShoppingBenchXMLToolParser(ToolParser):
+    def __init__(self, tokenizer) -> None:
+        self.tokenizer = tokenizer
+        self.tool_call_regex = re.compile(r"<tool_call>(.*?)</tool_call>", re.DOTALL)
+
+    @rollout_trace_op
+    async def extract_tool_calls(self, responses_ids: list[int]) -> list[FunctionCall]:
+        loop = asyncio.get_running_loop()
+        text = await loop.run_in_executor(None, self.tokenizer.decode, responses_ids)
+        matches = self.tool_call_regex.findall(text)
+        function_calls = []
+        for match in matches:
+            try:
+                parsed = json.loads(match.strip())
+            except Exception as e:
+                logger.error(f"Failed to decode ShoppingBench tool call: {e}")
+                continue
+            if isinstance(parsed, dict):
+                parsed = [parsed]
+            if not isinstance(parsed, list):
+                continue
+            for call in parsed:
+                if not isinstance(call, dict):
+                    continue
+                name = call.get("name")
+                arguments = call.get("parameters") or call.get("arguments") or {}
+                if isinstance(name, str) and isinstance(arguments, dict):
+                    function_calls.append(FunctionCall(name=name, arguments=json.dumps(arguments, ensure_ascii=False)))
+        return function_calls
+
+
 class ToolAgentLoop(AgentLoopBase):
     def __init__(self, config, server_manager, tokenizer):
         super().__init__(config, server_manager, tokenizer)
@@ -221,6 +252,11 @@ class ToolAgentLoop(AgentLoopBase):
                 length = self.max_tool_response_length // 2
                 tool_response = tool_response[:length] + "...(truncated)..." + tool_response[-length:]
 
+        if self.config.actor_rollout_ref.rollout.multi_turn.format == "shoppingbench_xml":
+            return {
+                "role": "user",
+                "content": f"<obs>{tool_response}</obs>",
+            }
         return {
             "role": "tool",
             "content": tool_response,
@@ -230,6 +266,7 @@ class ToolAgentLoop(AgentLoopBase):
     def get_tool_parser(cls, name: str) -> ToolParser:
         tool_parsers = {
             "hermes": HermesToolParser,
+            "shoppingbench_xml": ShoppingBenchXMLToolParser,
         }
         if name not in tool_parsers:
             raise ValueError(f"Unknown tool parser: {name}")
