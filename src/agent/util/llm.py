@@ -9,6 +9,8 @@ from openai import OpenAI
 
 MAX_RETRIES = 10
 TIMEOUT = float(os.getenv("SHOPPINGBENCH_LLM_TIMEOUT", "180"))
+CALL_DELAY = float(os.getenv("SHOPPINGBENCH_LLM_CALL_DELAY", "0"))
+RETRY_DELAY = float(os.getenv("SHOPPINGBENCH_LLM_RETRY_DELAY", "3"))
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger()
@@ -86,6 +88,8 @@ def ask_llm(
     for i in range(MAX_RETRIES):
         client = None
         try:
+            if CALL_DELAY > 0:
+                time.sleep(CALL_DELAY)
             http_client = (
                 httpx.Client(trust_env=False)
                 if should_bypass_env_proxy(resolved_base_url, model_config)
@@ -114,7 +118,7 @@ def ask_llm(
                 raise Exception("reasoning_content and content is empty")
         except Exception as e:
             logger.error(f"Error occurred: {e}. Retry {i+1}/{MAX_RETRIES}.")
-            time.sleep(3)
+            time.sleep(RETRY_DELAY)
         finally:
             if client is not None:
                 client.close()

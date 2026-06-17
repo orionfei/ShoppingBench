@@ -18,13 +18,13 @@ def main() -> None:
     out_path = ROOT / "data" / "rollout_voucher_mimo_state_folded_15.jsonl"
     rows = [
         json.loads(line)
-        for line in subset_path.read_text(encoding="utf-8").splitlines()
+        for line in subset_path.read_text(encoding="utf-8").split("\n")
         if line.strip()
     ]
 
     completed = set()
     if out_path.exists():
-        for line in out_path.read_text(encoding="utf-8").splitlines():
+        for line in out_path.read_text(encoding="utf-8").split("\n"):
             if not line.strip():
                 continue
             trajectory = json.loads(line)
