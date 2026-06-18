@@ -25,7 +25,6 @@ model
 *.egg-info
 *saves
 *wandb
-*.parquet
 *outputs
 *.log
 *run_tool.py
