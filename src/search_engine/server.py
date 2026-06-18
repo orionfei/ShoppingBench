@@ -3,6 +3,12 @@ import sys
 import ujson as json
 import multiprocessing
 
+# Pyserini imports optional OpenAI encoders while loading Lucene support.
+# The Lucene search server does not use them, so a placeholder avoids failing
+# before real API keys are configured for rollout/evaluation.
+os.environ.setdefault("OPENAI_API_KEY", "EMPTY")
+os.environ.setdefault("JAVA_TOOL_OPTIONS", "-Xmx2g -XX:MaxRAMPercentage=25")
+
 from pyserini.search.lucene import LuceneSearcher
 from flask import Flask, request, jsonify
 from waitress import serve

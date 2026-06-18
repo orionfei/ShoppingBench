@@ -42,11 +42,18 @@ dependencies = [
     "ray",
     "tensordict",
     "transformers",
-    "vllm",
+    "wandb",
+    "peft",
+    "torchdata",
 ]
 
 # Optional dependencies (extras_require in setup.py)
 [project.optional-dependencies]
+gpu-rollout = [
+  "vllm",
+  "flash-attn",
+  "flashinfer-python",
+]
 test = [
   "pytest", "yapf"
 ]

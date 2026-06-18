@@ -1,6 +1,9 @@
 products_filepath="data/products-large.jsonl"
 documents_filepath="resources/documents.jsonl"
 
+export OPENAI_API_KEY="${OPENAI_API_KEY:-EMPTY}"
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:--Xmx2g -XX:MaxRAMPercentage=25}"
+
 ## convert products to documents
 #rm -rf resources
 #mkdir -p resources

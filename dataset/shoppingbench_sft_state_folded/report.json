@@ -1,0 +1,35 @@
+{
+  "source": "data/teacher_voucher_train_clean691_state_folded.jsonl",
+  "trajectory_count": 691,
+  "max_length": 20480,
+  "train": {
+    "trajectories": 656,
+    "rows": 2050,
+    "dropped_overlong": 0,
+    "summary": {
+      "rows": 2050,
+      "step": {
+        "1": 656,
+        "2": 656,
+        "3": 656,
+        "4": 82
+      },
+      "max_tokens": 8504
+    }
+  },
+  "test": {
+    "trajectories": 35,
+    "rows": 109,
+    "dropped_overlong": 0,
+    "summary": {
+      "rows": 109,
+      "step": {
+        "1": 35,
+        "2": 35,
+        "3": 35,
+        "4": 4
+      },
+      "max_tokens": 8005
+    }
+  }
+}

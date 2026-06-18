@@ -67,6 +67,13 @@ data/*
 !data/teacher_voucher_train_clean691_final_audit.json
 !data/teacher_voucher_train_clean691_deep_audit.json
 !data/teacher_voucher_train_clean691_sft_report.json
+!data/rl_voucher_clean300_synthesize.jsonl
+!data/rl_voucher_queries_750_report.json
+!data/rl_voucher_queries_750.jsonl
+!data/rl_voucher_queries_750.meta.jsonl
+!data/rl_voucher_sample450_plan.jsonl
+!data/rl_voucher_sample450_synthesize.jsonl
+!data/rl_voucher_sample450_synthesize.meta.jsonl
 data/rollout*.jsonl
 data/smoke*.jsonl
 data/tmp/

@@ -34,6 +34,16 @@ from verl.utils.model import compute_position_id_with_mask
 logger = logging.getLogger(__name__)
 
 
+def _count_input_ids(tokenized) -> int:
+    if hasattr(tokenized, "data") and "input_ids" in tokenized:
+        tokenized = tokenized["input_ids"]
+    if hasattr(tokenized, "numel"):
+        return int(tokenized.numel())
+    if tokenized and isinstance(tokenized[0], list):
+        return len(tokenized[0])
+    return len(tokenized)
+
+
 def collate_fn(data_list: list[dict]) -> dict:
     """
     Collate a batch of sample dicts into batched tensors and arrays.
@@ -168,7 +178,7 @@ class RLHFDataset(Dataset):
             else:
 
                 def doc2len(doc) -> int:
-                    return len(tokenizer.apply_chat_template(doc[prompt_key], add_generation_prompt=True))
+                    return _count_input_ids(tokenizer.apply_chat_template(doc[prompt_key], add_generation_prompt=True))
 
             dataframe = dataframe.filter(
                 lambda doc: doc2len(doc) <= self.max_prompt_length,

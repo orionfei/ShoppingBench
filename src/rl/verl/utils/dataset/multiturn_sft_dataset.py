@@ -43,6 +43,18 @@ def convert_nested_value_to_list_recursive(data_item):
         return data_item
 
 
+def extract_input_ids(tokenized):
+    if hasattr(tokenized, "data") and "input_ids" in tokenized:
+        tokenized = tokenized["input_ids"]
+    if hasattr(tokenized, "dim") and tokenized.dim() == 2:
+        return tokenized[0]
+    if tokenized and isinstance(tokenized[0], list):
+        return torch.tensor(tokenized[0], dtype=torch.long)
+    if isinstance(tokenized, torch.Tensor):
+        return tokenized
+    return torch.tensor(tokenized, dtype=torch.long)
+
+
 class MultiTurnSFTDataset(Dataset):
     """
     Dataset for multi-turn conversations where each assistant response should be trained
@@ -298,7 +310,7 @@ class MultiTurnSFTDataset(Dataset):
 
         # Validate and convert tokens
         input_ids, loss_mask, attention_mask = self._validate_and_convert_tokens(
-            full_tokens[0], concat_tokens, concat_loss_mask, concat_attention_mask
+            extract_input_ids(full_tokens), concat_tokens, concat_loss_mask, concat_attention_mask
         )
 
         # Handle sequence length
