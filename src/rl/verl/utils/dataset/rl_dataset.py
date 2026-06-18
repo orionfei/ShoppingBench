@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 
 def _count_input_ids(tokenized) -> int:
+    if isinstance(tokenized, torch.Tensor):
+        return int(tokenized.numel())
     if hasattr(tokenized, "data") and "input_ids" in tokenized:
         tokenized = tokenized["input_ids"]
     if hasattr(tokenized, "numel"):

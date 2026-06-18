@@ -44,14 +44,14 @@ def convert_nested_value_to_list_recursive(data_item):
 
 
 def extract_input_ids(tokenized):
+    if isinstance(tokenized, torch.Tensor):
+        return tokenized[0] if tokenized.dim() == 2 else tokenized
     if hasattr(tokenized, "data") and "input_ids" in tokenized:
         tokenized = tokenized["input_ids"]
     if hasattr(tokenized, "dim") and tokenized.dim() == 2:
         return tokenized[0]
     if tokenized and isinstance(tokenized[0], list):
         return torch.tensor(tokenized[0], dtype=torch.long)
-    if isinstance(tokenized, torch.Tensor):
-        return tokenized
     return torch.tensor(tokenized, dtype=torch.long)
 
 

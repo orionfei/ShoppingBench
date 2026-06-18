@@ -7,7 +7,9 @@ import multiprocessing
 # The Lucene search server does not use them, so a placeholder avoids failing
 # before real API keys are configured for rollout/evaluation.
 os.environ.setdefault("OPENAI_API_KEY", "EMPTY")
-os.environ.setdefault("JAVA_TOOL_OPTIONS", "-Xmx2g -XX:MaxRAMPercentage=25")
+if not os.environ.get("OMP_NUM_THREADS") or os.environ.get("OMP_NUM_THREADS") == "0":
+    os.environ["OMP_NUM_THREADS"] = "8"
+os.environ.setdefault("JAVA_TOOL_OPTIONS", "-Xmx8g -XX:MaxRAMPercentage=25")
 
 from pyserini.search.lucene import LuceneSearcher
 from flask import Flask, request, jsonify
@@ -19,7 +21,7 @@ print("Load indexes done.", file=sys.stderr)
 app = Flask(__name__)
 
 
-CAPACITY = int(os.getenv("SHOPPINGBENCH_SEARCH_CAPACITY", "100000"))
+CAPACITY = int(os.getenv("SHOPPINGBENCH_SEARCH_CAPACITY", "5000"))
 PAGE_SIZE = 10
 MAX_PAGE = 5
 SEARCH_FIELDS = ["product_id", "shop_id", "title", "price", "service", "sold_count"]

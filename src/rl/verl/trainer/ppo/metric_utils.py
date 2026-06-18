@@ -392,8 +392,25 @@ def process_validation_metrics(
     for data_source, prompt2var2vals in data_src2prompt2var2vals.items():
         for prompt, var2vals in prompt2var2vals.items():
             for var_name, var_vals in var2vals.items():
-                if isinstance(var_vals[0], str):
+                pred_vals = var2vals.get("pred", None)
+                numeric_vals = []
+                numeric_preds = []
+                for idx, val in enumerate(var_vals):
+                    if val is None or isinstance(val, str):
+                        continue
+                    try:
+                        val = float(val)
+                    except (TypeError, ValueError):
+                        continue
+                    if not np.isfinite(val):
+                        continue
+                    numeric_vals.append(val)
+                    if pred_vals is not None:
+                        numeric_preds.append(pred_vals[idx])
+
+                if not numeric_vals:
                     continue
+                var_vals = numeric_vals
 
                 metric = {}
                 n_resps = len(var_vals)
@@ -415,9 +432,9 @@ def process_validation_metrics(
                         )
                         metric[f"best@{n}/mean"], metric[f"best@{n}/std"] = bon_mean, bon_std
                         metric[f"worst@{n}/mean"], metric[f"worst@{n}/std"] = won_mean, won_std
-                        if var2vals.get("pred", None) is not None:
+                        if pred_vals is not None:
                             vote_data = [
-                                {"val": val, "pred": pred} for val, pred in zip(var_vals, var2vals["pred"], strict=True)
+                                {"val": val, "pred": pred} for val, pred in zip(var_vals, numeric_preds, strict=True)
                             ]
                             [(maj_n_mean, maj_n_std)] = bootstrap_metric(
                                 data=vote_data,

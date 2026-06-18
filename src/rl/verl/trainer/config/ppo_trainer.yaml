@@ -96,6 +96,9 @@ actor_rollout_ref:
     # Whether to enable loading a remote code model
     trust_remote_code: false
 
+    # Attention implementation for Hugging Face model loading. Use sdpa on RTX 4080 to avoid requiring flash-attn.
+    attn_implementation: sdpa
+
   # Rollout model config.
   rollout:
 

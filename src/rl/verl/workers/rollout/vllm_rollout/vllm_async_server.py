@@ -270,6 +270,15 @@ class AsyncvLLMServer(AsyncServerBase):
         model_config = self.engine.model_config
         BASE_MODEL_PATHS = [BaseModelPath(name=model_name, model_path=model_path)]
         models = OpenAIServingModels(self.engine, model_config, BASE_MODEL_PATHS)
+        # ShoppingBench XML tool calls are parsed by verl's ToolAgentLoop after
+        # raw generation. vLLM's OpenAI auto-tool parser only knows its own
+        # registered formats, so keep it disabled for this custom XML format.
+        openai_tool_parser = config.multi_turn.format
+        enable_openai_tools = config.multi_turn.tool_config_path is not None
+        if openai_tool_parser == "shoppingbench_xml":
+            openai_tool_parser = None
+            enable_openai_tools = False
+
         self.openai_serving_chat = OpenAIServingChat(
             self.engine,
             model_config,
@@ -278,8 +287,8 @@ class AsyncvLLMServer(AsyncServerBase):
             request_logger=RequestLogger(max_log_len=4096),
             chat_template=None,
             chat_template_content_format="auto",
-            enable_auto_tools=config.multi_turn.tool_config_path is not None,
-            tool_parser=config.multi_turn.format,  # hermes, llama3_json, ...
+            enable_auto_tools=enable_openai_tools,
+            tool_parser=openai_tool_parser,  # hermes, llama3_json, ...
         )
 
     def _create_engine_config(self, engine_args: AsyncEngineArgs):

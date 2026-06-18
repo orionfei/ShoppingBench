@@ -38,9 +38,14 @@ from verl.utils.ulysses import gather_outpus_and_unpad, ulysses_pad, ulysses_pad
 from verl.workers.actor import BasePPOActor
 
 if is_cuda_available:
-    from flash_attn.bert_padding import index_first_axis, pad_input, rearrange, unpad_input
+    try:
+        from flash_attn.bert_padding import index_first_axis, pad_input, rearrange, unpad_input
+    except ImportError:
+        index_first_axis = pad_input = rearrange = unpad_input = None
 elif is_npu_available:
     from transformers.integrations.npu_flash_attention import index_first_axis, pad_input, rearrange, unpad_input
+else:
+    index_first_axis = pad_input = rearrange = unpad_input = None
 
 
 __all__ = ["DataParallelPPOActor"]
@@ -57,6 +62,8 @@ class DataParallelPPOActor(BasePPOActor):
         self.actor_optimizer = actor_optimizer
 
         self.use_remove_padding = self.config.get("use_remove_padding", False)
+        if self.use_remove_padding and unpad_input is None:
+            raise ImportError("flash-attn is required when actor use_remove_padding=True.")
         if torch.distributed.get_rank() == 0:
             print(f"Actor use_remove_padding={self.use_remove_padding}")
         self.use_fused_kernels = self.config.get("use_fused_kernels", False)

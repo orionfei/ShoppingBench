@@ -44,6 +44,9 @@ optim:
   # LR warmup style: "constant" or "cosine"
   warmup_style: constant
 
+  # AdamW foreach mode. Null keeps PyTorch default; false can reduce peak temporary GPU memory.
+  foreach: null
+
 # configs for FSDP
 fsdp_config:
 

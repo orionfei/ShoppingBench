@@ -250,8 +250,9 @@ class ActorRolloutRefWorker(Worker, DistProfilerExtension):
             torch_dtype = PrecisionType.to_dtype(torch_dtype)
 
         # override model kwargs
+        attn_implementation = self.config.model.get("attn_implementation", "sdpa")
         actor_model_config = AutoConfig.from_pretrained(
-            local_path, trust_remote_code=trust_remote_code, attn_implementation="flash_attention_2"
+            local_path, trust_remote_code=trust_remote_code, attn_implementation=attn_implementation
         )
 
         # patch for kimi-vl
@@ -420,6 +421,7 @@ class ActorRolloutRefWorker(Worker, DistProfilerExtension):
                 lr=optim_config.lr,
                 betas=optim_config.get("betas", (0.9, 0.999)),
                 weight_decay=optim_config.get("weight_decay", 1e-2),
+                foreach=optim_config.get("foreach", None),
             )
 
             total_steps = optim_config.get("total_training_steps", 0)

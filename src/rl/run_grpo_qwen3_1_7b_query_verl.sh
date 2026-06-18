@@ -6,28 +6,59 @@ export EXPERIMENT_NAME="${EXPERIMENT_NAME:-grpo_qwen3-1.7b_query_verl}"
 export PYTHONUNBUFFERED=1
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 export SHOPPINGBENCH_PRODUCT_CACHE="${SHOPPINGBENCH_PRODUCT_CACHE:-dataset/shoppingbench_query/product_cache.json}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS_OVERRIDE:-8}"
+export RAY_DISABLE_DOCKER_CPU_WARNING="${RAY_DISABLE_DOCKER_CPU_WARNING:-1}"
+export VLLM_USE_V1="${VLLM_USE_V1:-1}"
+export NO_PROXY="${NO_PROXY:-127.0.0.1,localhost}"
+case ",$NO_PROXY," in
+  *,127.0.0.1,*) ;;
+  *) export NO_PROXY="$NO_PROXY,127.0.0.1,localhost" ;;
+esac
+export no_proxy="$NO_PROXY"
 
-MODEL_PATH="${1:-${MODEL_PATH:-model/Qwen3-1.7B}}"
+MODEL_PATH="${MODEL_PATH:-model/Qwen3-1.7B}"
+if [[ $# -gt 0 && "$1" != --* && "$1" != *=* ]]; then
+  MODEL_PATH="$1"
+  shift
+fi
 TRAIN_FILES="${TRAIN_FILES:-dataset/shoppingbench_query/train.parquet}"
 VAL_FILES="${VAL_FILES:-dataset/shoppingbench_query/test.parquet}"
 
-TRAIN_BATCH_SIZE="${TRAIN_BATCH_SIZE:-16}"
-VAL_BATCH_SIZE="${VAL_BATCH_SIZE:-16}"
+TRAIN_BATCH_SIZE="${TRAIN_BATCH_SIZE:-8}"
+VAL_BATCH_SIZE="${VAL_BATCH_SIZE:-8}"
 MAX_PROMPT_LENGTH="${MAX_PROMPT_LENGTH:-4096}"
 MAX_RESPONSE_LENGTH="${MAX_RESPONSE_LENGTH:-4096}"
-PPO_MINI_BATCH_SIZE="${PPO_MINI_BATCH_SIZE:-16}"
+PPO_MINI_BATCH_SIZE="${PPO_MINI_BATCH_SIZE:-8}"
 PPO_MICRO_BATCH_SIZE_PER_GPU="${PPO_MICRO_BATCH_SIZE_PER_GPU:-1}"
 LOG_PROB_MICRO_BATCH_SIZE_PER_GPU="${LOG_PROB_MICRO_BATCH_SIZE_PER_GPU:-1}"
 PPO_MAX_TOKEN_LEN_PER_GPU="${PPO_MAX_TOKEN_LEN_PER_GPU:-24576}"
-ROLLOUT_MAX_NUM_BATCHED_TOKENS="${ROLLOUT_MAX_NUM_BATCHED_TOKENS:-24576}"
-ROLLOUT_N="${ROLLOUT_N:-4}"
-ROLLOUT_TEMPERATURE="${ROLLOUT_TEMPERATURE:-0.7}"
+ROLLOUT_MAX_NUM_BATCHED_TOKENS="${ROLLOUT_MAX_NUM_BATCHED_TOKENS:-8192}"
+ROLLOUT_MAX_MODEL_LEN="${ROLLOUT_MAX_MODEL_LEN:-8192}"
+ROLLOUT_MAX_NUM_SEQS="${ROLLOUT_MAX_NUM_SEQS:-16}"
+ROLLOUT_N="${ROLLOUT_N:-3}"
+ROLLOUT_TEMPERATURE="${ROLLOUT_TEMPERATURE:-1.0}"
 ROLLOUT_TOP_P="${ROLLOUT_TOP_P:-0.9}"
 ROLLOUT_GPU_MEMORY_UTILIZATION="${ROLLOUT_GPU_MEMORY_UTILIZATION:-0.6}"
 ROLLOUT_TENSOR_MODEL_PARALLEL_SIZE="${ROLLOUT_TENSOR_MODEL_PARALLEL_SIZE:-1}"
 ROLLOUT_MODE="${ROLLOUT_MODE:-async}"
 ROLLOUT_NAME="${ROLLOUT_NAME:-vllm}"
-LEARNING_RATE="${LEARNING_RATE:-5e-7}"
+ROLLOUT_AGENT_NUM_WORKERS="${ROLLOUT_AGENT_NUM_WORKERS:-4}"
+MAX_ASSISTANT_TURNS="${MAX_ASSISTANT_TURNS:-6}"
+MAX_USER_TURNS="${MAX_USER_TURNS:-6}"
+MAX_TOOL_RESPONSE_LENGTH="${MAX_TOOL_RESPONSE_LENGTH:-256}"
+TOKENIZATION_SANITY_CHECK_MODE="${TOKENIZATION_SANITY_CHECK_MODE:-ignore_strippable}"
+ATTN_IMPLEMENTATION="${ATTN_IMPLEMENTATION:-sdpa}"
+USE_REMOVE_PADDING="${USE_REMOVE_PADDING:-False}"
+LORA_RANK="${LORA_RANK:-0}"
+LORA_ALPHA="${LORA_ALPHA:-16}"
+TARGET_MODULES="${TARGET_MODULES:-all-linear}"
+USE_KL_LOSS="${USE_KL_LOSS:-True}"
+KL_LOSS_COEF="${KL_LOSS_COEF:-0.001}"
+KL_LOSS_TYPE="${KL_LOSS_TYPE:-low_var_kl}"
+REF_PARAM_OFFLOAD="${REF_PARAM_OFFLOAD:-True}"
+ACTOR_OPTIMIZER_OFFLOAD="${ACTOR_OPTIMIZER_OFFLOAD:-False}"
+ACTOR_OPTIMIZER_FOREACH="${ACTOR_OPTIMIZER_FOREACH:-null}"
+LEARNING_RATE="${LEARNING_RATE:-1e-6}"
 NGPUS_PER_NODE="${NGPUS_PER_NODE:-1}"
 NNODES="${NNODES:-1}"
 TOTAL_EPOCHS="${TOTAL_EPOCHS:-3}"
@@ -55,16 +86,23 @@ python3 -m verl.trainer.main_ppo \
   actor_rollout_ref.model.path="$MODEL_PATH" \
   actor_rollout_ref.model.enable_gradient_checkpointing=True \
   actor_rollout_ref.model.trust_remote_code=True \
-  actor_rollout_ref.model.use_remove_padding=True \
+  actor_rollout_ref.model.use_remove_padding="$USE_REMOVE_PADDING" \
+  actor_rollout_ref.model.attn_implementation="$ATTN_IMPLEMENTATION" \
+  actor_rollout_ref.model.lora_rank="$LORA_RANK" \
+  actor_rollout_ref.model.lora_alpha="$LORA_ALPHA" \
+  actor_rollout_ref.model.target_modules="$TARGET_MODULES" \
   actor_rollout_ref.actor.ppo_mini_batch_size="$PPO_MINI_BATCH_SIZE" \
   actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu="$PPO_MICRO_BATCH_SIZE_PER_GPU" \
   actor_rollout_ref.actor.use_dynamic_bsz=True \
   actor_rollout_ref.actor.ppo_max_token_len_per_gpu="$PPO_MAX_TOKEN_LEN_PER_GPU" \
-  actor_rollout_ref.actor.use_kl_loss=False \
-  actor_rollout_ref.actor.kl_loss_coef=0.001 \
-  actor_rollout_ref.actor.kl_loss_type=low_var_kl \
+  actor_rollout_ref.actor.use_kl_loss="$USE_KL_LOSS" \
+  actor_rollout_ref.actor.kl_loss_coef="$KL_LOSS_COEF" \
+  actor_rollout_ref.actor.kl_loss_type="$KL_LOSS_TYPE" \
   actor_rollout_ref.actor.optim.lr="$LEARNING_RATE" \
+  actor_rollout_ref.actor.optim.foreach="$ACTOR_OPTIMIZER_FOREACH" \
+  actor_rollout_ref.actor.fsdp_config.optimizer_offload="$ACTOR_OPTIMIZER_OFFLOAD" \
   actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu="$LOG_PROB_MICRO_BATCH_SIZE_PER_GPU" \
+  actor_rollout_ref.ref.fsdp_config.param_offload="$REF_PARAM_OFFLOAD" \
   actor_rollout_ref.rollout.name="$ROLLOUT_NAME" \
   actor_rollout_ref.rollout.mode="$ROLLOUT_MODE" \
   actor_rollout_ref.rollout.temperature="$ROLLOUT_TEMPERATURE" \
@@ -73,11 +111,18 @@ python3 -m verl.trainer.main_ppo \
   actor_rollout_ref.rollout.gpu_memory_utilization="$ROLLOUT_GPU_MEMORY_UTILIZATION" \
   actor_rollout_ref.rollout.tensor_model_parallel_size="$ROLLOUT_TENSOR_MODEL_PARALLEL_SIZE" \
   actor_rollout_ref.rollout.max_num_batched_tokens="$ROLLOUT_MAX_NUM_BATCHED_TOKENS" \
+  actor_rollout_ref.rollout.max_model_len="$ROLLOUT_MAX_MODEL_LEN" \
+  actor_rollout_ref.rollout.max_num_seqs="$ROLLOUT_MAX_NUM_SEQS" \
   actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu="$LOG_PROB_MICRO_BATCH_SIZE_PER_GPU" \
   actor_rollout_ref.rollout.n="$ROLLOUT_N" \
   actor_rollout_ref.rollout.multi_turn.enable=True \
   actor_rollout_ref.rollout.multi_turn.format=shoppingbench_xml \
   actor_rollout_ref.rollout.multi_turn.tool_config_path=config/rl/shoppingbench_tools.yaml \
+  actor_rollout_ref.rollout.multi_turn.max_assistant_turns="$MAX_ASSISTANT_TURNS" \
+  actor_rollout_ref.rollout.multi_turn.max_user_turns="$MAX_USER_TURNS" \
+  actor_rollout_ref.rollout.multi_turn.max_tool_response_length="$MAX_TOOL_RESPONSE_LENGTH" \
+  actor_rollout_ref.rollout.multi_turn.tokenization_sanity_check_mode="$TOKENIZATION_SANITY_CHECK_MODE" \
+  actor_rollout_ref.rollout.agent.num_workers="$ROLLOUT_AGENT_NUM_WORKERS" \
   actor_rollout_ref.rollout.val_kwargs.n="$ROLLOUT_N" \
   actor_rollout_ref.rollout.val_kwargs.temperature="$ROLLOUT_TEMPERATURE" \
   actor_rollout_ref.rollout.val_kwargs.top_p="$ROLLOUT_TOP_P" \
@@ -96,4 +141,5 @@ python3 -m verl.trainer.main_ppo \
   trainer.rollout_data_dir="$ROLLOUT_DATA_DIR" \
   trainer.validation_data_dir="$VALIDATION_DATA_DIR" \
   trainer.val_only="$VAL_ONLY" \
-  trainer.val_before_train="$VAL_BEFORE_TRAIN"
+  trainer.val_before_train="$VAL_BEFORE_TRAIN" \
+  "$@"
