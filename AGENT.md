@@ -53,6 +53,25 @@ During SFT, checkpoints are saved at fixed intervals, for example every
 queries, for example `8` queries, and run GRPO-style rollouts with group size
 `G=4`.
 
+The fixed-step probing process is:
+
+1. Train SFT normally with teacher trajectory supervision.
+2. Save checkpoints at fixed progress intervals, such as `0.25`, `0.50`,
+   `0.75`, `1.00` epoch, instead of waiting only for the final checkpoint.
+3. Before comparing checkpoints, choose a fixed probe query set from the RL
+   training queries, for example `8` voucher-budget queries. This probe set
+   should stay unchanged across all SFT checkpoints.
+4. For each SFT checkpoint, load that checkpoint as the rollout policy and run
+   `G` rollouts per probe query, for example `G=4`.
+5. Score the resulting grouped rollouts with protocol and task metrics.
+6. Select the checkpoint whose protocol is stable enough and whose task-level
+   rollout variance is still high enough for GRPO.
+
+The probe query set is fixed so checkpoint differences reflect the model state,
+not changes in sampled queries. Multiple rollouts per query are needed because
+GRPO learns from within-query group differences; a single rollout cannot reveal
+whether the checkpoint still has useful decision variance.
+
 The checkpoint probe logic is in:
 
 ```text
