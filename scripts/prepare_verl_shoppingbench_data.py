@@ -209,12 +209,17 @@ def summarize_query_rows(rows: list[dict]) -> dict:
 
 def convert_query_row(row: dict, idx: int, split: str, system_prompt: str, meta: dict | None) -> dict:
     ground_truth = {"reward": row["reward"], "voucher": row["voucher"]}
+    voucher = row.get("voucher", {})
     extra_info = {
         "split": split,
         "index": idx,
         "query": row["query"],
-        "reward": row["reward"],
-        "voucher": row["voucher"],
+        "voucher_type": voucher.get("voucher_type"),
+        "budget": voucher.get("budget"),
+        "product_count": len(row.get("reward", [])),
+        "reward_product_ids": [
+            str(item["product_id"]) for item in row.get("reward", []) if item.get("product_id") is not None
+        ],
     }
     if meta:
         extra_info["source_meta"] = meta
@@ -274,6 +279,7 @@ def prepare_query(args, tokenizer) -> dict:
     }
     for split, pairs in [("train", train_pairs), ("test", val_pairs)]:
         converted = []
+        kept_source_rows = []
         dropped = []
         for idx, pair in enumerate(pairs):
             item = convert_query_row(pair["row"], idx, split, system_prompt, pair["meta"])
@@ -281,13 +287,14 @@ def prepare_query(args, tokenizer) -> dict:
             if length <= args.query_max_prompt_length:
                 item["extra_info"]["prompt_tokens"] = length
                 converted.append(item)
+                kept_source_rows.append(pair["row"])
             else:
                 dropped.append({"index": idx, "prompt_tokens": length})
         pd.DataFrame(converted).to_parquet(output_dir / f"{split}.parquet")
         report[split] = {
             "rows": len(converted),
             "dropped_overlong": len(dropped),
-            "distribution": summarize_query_rows([item["extra_info"] for item in converted]),
+            "distribution": summarize_query_rows(kept_source_rows),
             "max_prompt_tokens": max((item["extra_info"]["prompt_tokens"] for item in converted), default=0),
         }
     write_json(output_dir / "report.json", report)

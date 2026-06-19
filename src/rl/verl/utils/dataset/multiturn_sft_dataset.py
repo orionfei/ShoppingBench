@@ -55,6 +55,15 @@ def extract_input_ids(tokenized):
     return torch.tensor(tokenized, dtype=torch.long)
 
 
+def common_prefix_len(left: str, right: str) -> int:
+    length = 0
+    for a, b in zip(left, right, strict=False):
+        if a != b:
+            break
+        length += 1
+    return length
+
+
 class MultiTurnSFTDataset(Dataset):
     """
     Dataset for multi-turn conversations where each assistant response should be trained
@@ -170,19 +179,44 @@ class MultiTurnSFTDataset(Dataset):
         )
         # Get tokens for the current message only
         if is_assistant:
-            generation_prompt_text = prev_applied_text_w_generation_prompt[len(prev_applied_text) :]
+            prompt_end = len(prev_applied_text_w_generation_prompt)
+            if not cur_applied_text.startswith(prev_applied_text_w_generation_prompt):
+                # Qwen3 with enable_thinking=False inserts an empty think block in the
+                # generation prompt. SFT labels here can already contain <think>...</think>,
+                # so use the assistant header prefix that actually matches the label text.
+                alt_generation_prompt = self.tokenizer.apply_chat_template(
+                    messages[:start_idx],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=True,
+                    tools=tools,
+                )
+                if cur_applied_text.startswith(alt_generation_prompt):
+                    prev_applied_text_w_generation_prompt = alt_generation_prompt
+                    prompt_end = len(prev_applied_text_w_generation_prompt)
+                else:
+                    prompt_end = common_prefix_len(prev_applied_text_w_generation_prompt, cur_applied_text)
+
+            generation_prompt_text = cur_applied_text[len(prev_applied_text) : prompt_end]
             generation_prompt_tokens = self.tokenizer.encode(
                 generation_prompt_text,
                 add_special_tokens=False,
             )
             _message_tokens = self.tokenizer.encode(
-                cur_applied_text[len(prev_applied_text_w_generation_prompt) :],
+                cur_applied_text[prompt_end:],
                 add_special_tokens=False,
             )
             message_tokens = generation_prompt_tokens + _message_tokens
-            loss_mask = [0] * (len(generation_prompt_tokens)) + [1] * (
-                len(message_tokens) - len(generation_prompt_tokens)
-            )
+            loss_mask = [0] * len(message_tokens)
+            if _message_tokens:
+                if generation_prompt_tokens:
+                    first_predict_pos = len(generation_prompt_tokens) - 1
+                    last_predict_pos = len(message_tokens) - 1
+                else:
+                    first_predict_pos = 0
+                    last_predict_pos = max(len(_message_tokens) - 1, 0)
+                for pos in range(first_predict_pos, last_predict_pos):
+                    loss_mask[pos] = 1
         else:
             message_tokens = self.tokenizer.encode(
                 cur_applied_text[len(prev_applied_text) :],
