@@ -6,7 +6,6 @@ logs
 logs/
 log/*
 log
-log*
 server.log
 server*.log
 .DS_Store
@@ -44,6 +43,8 @@ model
 # Local models and checkpoints
 /Qwen3-Embedding-0.6B/
 /models/
+/model/
+/checkpoints/
 *.safetensors
 *.bin
 *.pt
@@ -55,6 +56,9 @@ model
 *.h5
 
 # Generated / temporary datasets and experiment outputs
+rollouts/
+plots/
+outputs/
 data/*
 !data/synthesize_voucher_train_plan.jsonl
 !data/synthesize_voucher_train.jsonl
@@ -77,6 +81,8 @@ data/rollout*.jsonl
 data/smoke*.jsonl
 data/tmp/
 data/tmp_*
+dataset/probe/
+dataset/shoppingbench_query/train_sft_overlap_300.parquet
 config/tmp/
 resources/*.jsonl
 resources/documents.jsonl

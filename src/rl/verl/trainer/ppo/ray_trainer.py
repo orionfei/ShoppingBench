@@ -765,6 +765,8 @@ class RayPPOTrainer:
 
             test_batch = test_batch.union(test_output_gen_batch)
             test_batch.meta_info["validate"] = True
+            test_batch.meta_info["global_steps"] = self.global_steps
+            test_batch.meta_info["total_training_steps"] = self.total_training_steps
 
             # evaluate using reward_function
             result = self.val_reward_fn(test_batch, return_dict=True)
@@ -1187,6 +1189,8 @@ class RayPPOTrainer:
                     # repeat to align with repeated responses in rollout
                     batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
                     batch = batch.union(gen_batch_output)
+                    batch.meta_info["global_steps"] = self.global_steps
+                    batch.meta_info["total_training_steps"] = self.total_training_steps
 
                     if "response_mask" not in batch.batch.keys():
                         batch.batch["response_mask"] = compute_response_mask(batch)

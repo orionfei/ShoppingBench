@@ -1,23 +1,18 @@
 # ShoppingBench Reward Design
 
-This note records the current reward design for SFT checkpoint probing and
-query-level GRPO training.
+This document records the reward that is currently used by the ShoppingBench
+query-level RL pipeline.
 
-The central distinction is:
+The reward is split into two parts:
 
-- `protocol_reward` measures whether the model can follow the output and tool
+- `protocol_reward`: whether the model follows the output format and tool
   protocol.
-- `task_reward` measures whether the model is making correct task progress and
-  eventually reaches the correct outcome.
+- `task_reward`: how far the trajectory correctly advances the shopping task.
 
-SFT checkpoint selection uses both. Formal GRPO may use a small amount of
-protocol reward at the beginning, but it should anneal that weight to zero so
-the final optimization target is task correctness.
+The final RL objective may include a small protocol term early in training, but
+the long-term optimization target should be task correctness.
 
 ## 1. Protocol Reward
-
-Protocol reward checks whether the model is able to play the environment
-properly.
 
 ```text
 protocol_reward =
@@ -25,8 +20,8 @@ protocol_reward =
 + 0.5 * tool_valid
 ```
 
-`format_valid` checks whether assistant output follows the required XML-style
-format, for example:
+`format_valid` checks whether each assistant message follows the required
+structure:
 
 ```text
 <think>...</think>
@@ -44,267 +39,254 @@ or:
 
 - tool names are in the allowed ShoppingBench tool set
 - `parameters` is a JSON object
+- required parameters are present
 - tool observations are present and usable
 - `python_execute` does not fail
 
-Protocol reward should not be treated as final task success. It only says the
-model can produce legal actions in the environment.
+Protocol reward is not task success. It only measures whether the model can play
+the environment correctly.
 
-## 2. Correctness-Aware Progress
-
-Progress reward should not merely reward whether a stage was attempted. It must
-verify that each stage moves toward the correct answer.
-
-The proposed progress reward is:
-
-```text
-progress =
-  0.10 * search_gold_recall
-+ 0.20 * select_gold_overlap
-+ 0.10 * same_shop_correct
-+ 0.15 * verify_selected_gold
-+ 0.15 * budget_recomputed_correct
-+ 0.10 * within_budget_correct
-+ 0.10 * recommend_gold_overlap
-+ 0.10 * terminate_after_valid_recommend
-```
-
-The weights sum to `1.0`.
-
-### search_gold_recall
-
-Checks whether search observations contain the gold product ids.
-
-```text
-search_gold_recall =
-  |observed_candidate_ids ∩ gold_ids| / |gold_ids|
-```
-
-This is different from rewarding any `find_product` call. A search that never
-surfaces the correct products should not receive high progress.
-
-### select_gold_overlap
-
-Checks whether selected product ids overlap with gold product ids.
-
-```text
-select_gold_overlap =
-  |selected_ids ∩ gold_ids| / |gold_ids|
-```
-
-Selecting the correct number of products is not enough. Wrong selected products
-should receive little or no credit here.
-
-### same_shop_correct
-
-Checks the shop constraint.
-
-For platform vouchers, this component is `1.0` because same-shop is not needed.
-
-For shop vouchers, selected or recommended products must come from the same
-shop:
-
-```text
-same_shop_correct = 1.0 if len(selected_shop_ids) == 1 else 0.0
-```
-
-Shop ids must come from observed candidates or the product cache. Do not trust a
-model-written shop id without verification.
-
-### verify_selected_gold
-
-Checks whether the model verified selected products that are also gold products.
-
-```text
-verify_selected_gold =
-  |viewed_ids ∩ selected_ids ∩ gold_ids| / |gold_ids|
-```
-
-Viewing arbitrary products should not be rewarded as much as verifying products
-that matter for the correct answer.
-
-### budget_recomputed_correct
-
-Checks whether budget calculation can be independently verified.
-
-The reward should not trust the model's `python_execute` result by itself. It
-should recompute totals from observed prices/shop ids or from the product cache:
-
-- total before voucher
-- voucher applicability
-- discount amount
-- payable total
-- budget comparison
-
-This component should be high only when the budget calculation is supported by
-environment evidence.
-
-### within_budget_correct
-
-Checks whether the selected or recommended products are actually within budget
-after recomputing voucher application.
-
-```text
-within_budget_correct = 1.0 if recomputed_payable_total <= budget else 0.0
-```
-
-This differs from `budget_recomputed_correct`: one checks whether the
-calculation is trustworthy, the other checks whether the result satisfies the
-budget constraint.
-
-### recommend_gold_overlap
-
-Checks whether final recommended product ids overlap with gold ids.
-
-```text
-recommend_gold_overlap =
-  |recommended_ids ∩ gold_ids| / |gold_ids|
-```
-
-For shaping, overlap is useful because exact success may be sparse. Exact
-matching is handled separately in `outcome`.
-
-### terminate_after_valid_recommend
-
-Checks whether the model terminates only after a meaningful recommendation.
-
-A permissive version:
-
-```text
-terminate_after_valid_recommend =
-  1.0 if terminate_success and recommend_gold_overlap > 0 else 0.0
-```
-
-A stricter version can require exact final success before giving terminate
-credit. The permissive version is more useful for dense shaping, while the
-strict version is safer against premature `terminate(success)`.
-
-## 3. Outcome Reward
-
-Outcome reward is the sparse final-success signal.
-
-Recommended first version:
-
-```text
-outcome =
-  2.0 * exact_success
-+ 1.0 * budget_success
-```
-
-`exact_success`:
-
-```text
-recommended_ids == gold_ids
-```
-
-The comparison should preserve order when the task requires products in request
-order.
-
-`budget_success`:
-
-```text
-recomputed_payable_total <= budget
-```
-
-The payable total must be recomputed from environment evidence or product cache,
-not accepted from model text alone.
-
-An even stricter binary outcome can also be defined:
-
-```text
-final_success =
-  exact_success
-  and budget_success
-  and terminate_success
-```
-
-Then:
-
-```text
-outcome = 3.0 * final_success
-```
-
-The weighted exact-plus-budget version gives more gradient signal when product
-selection is right but termination or minor protocol details are imperfect.
-
-## 4. Task Reward
-
-The task reward combines correctness-aware progress, final outcome, and a small
-step penalty.
+## 2. Task Reward
 
 ```text
 task_reward =
   progress
 + outcome
-- step_penalty
+- penalties
 ```
-
-Recommended step penalty:
 
 ```text
-step_penalty = 0.02 * steps
+penalties =
+  step_penalty
++ wrong_recommend_penalty
++ count_penalty
++ premature_terminate_penalty
++ invalid_tool_penalty
 ```
-
-Expanded recommended version:
 
 ```text
-task_reward =
-  progress
-+ 2.0 * exact_success
-+ 1.0 * budget_success
-- 0.02 * steps
+step_penalty = 0.005 * steps
 ```
 
-The step penalty prevents the model from endlessly searching, viewing, or
-recomputing to collect shaping reward.
+`steps` is the number of assistant turns. The penalty is intentionally small so
+early RL exploration is not killed before the model learns to recommend and
+terminate correctly.
 
-## 5. SFT Checkpoint Probe
+Wrong or opportunistic recommendations are penalized:
 
-For each fixed SFT checkpoint, run a fixed probe query set. For example:
+- recommending products with zero gold overlap
+- recommending too many or too few products
+- terminating successfully before any recommendation
+- making structurally invalid tool calls
+
+## 3. Progress Reward
+
+Progress reward is correctness-aware. It rewards a stage only when that stage is
+supported by environment evidence and moves toward the gold ShoppingBench answer.
 
 ```text
-8 probe queries
-G = 4 rollouts per query
-32 total rollouts per checkpoint
+progress =
++ 0.18 * search_gold_recall
++ 0.18 * select_gold_f1
++ 0.12 * verify_gold_f1
++ 0.08 * shop_constraint_correct
++ 0.10 * budget_attempt_quality
++ 0.12 * budget_recomputed_correct
++ 0.12 * budget_numeric_alignment
++ 0.10 * within_budget_correct
++ 0.35 * recommend_gold_f1
++ 0.12 * recommend_count_match
++ 0.25 * set_exact
++ 0.10 * terminate_quality
 ```
 
-For every rollout, compute:
+The weights no longer sum to `1.0`. The task reward is deliberately denser and
+higher-variance, because GRPO needs stable within-query preference differences.
+Search gets useful but limited credit; recommendation, exact set matching,
+budget evidence, and valid termination carry the stronger learning signal.
+
+### search_gold_recall
 
 ```text
-protocol_reward
-task_reward
+search_gold_recall =
+  |observed_candidate_ids intersect gold_ids| / |gold_ids|
 ```
 
-Then group rollouts by query and compute:
+This gives small credit for surfacing the correct products in search results. A
+trajectory that searches but never observes gold products gets no credit here.
+
+### select_gold_f1
 
 ```text
-protocol_mean
-protocol_group_var_mean
-task_group_var_mean
+select_gold_f1 = F1(selected_ids, gold_ids)
 ```
 
-Selection criterion:
+F1 is used instead of recall so extra wrong products reduce the score. This
+rewards partial correct selection without letting long product lists hack the
+reward.
+
+### verify_gold_f1
 
 ```text
-high protocol_mean
-low protocol_group_var_mean
-high task_group_var_mean
+verify_gold_f1 = F1(viewed_product_ids, gold_ids)
 ```
 
-Interpretation:
+Viewing random products is not rewarded. Verification credit is given only for
+viewing products that overlap with the gold answer, with extra wrong viewed
+products penalized through precision.
 
-- high `protocol_mean`: the checkpoint can produce legal format and tool calls
-- low `protocol_group_var_mean`: protocol behavior is stable
-- high `task_group_var_mean`: task decisions still branch enough for GRPO to
-  learn from within-query reward differences
+### shop_constraint_correct
 
-The probe query set must be fixed across checkpoints. Otherwise differences may
-come from query sampling noise rather than checkpoint quality.
+```text
+shop_constraint_correct =
+  same_shop_or_platform_ok * F1(selected_or_recommended_ids, gold_ids)
+```
+
+For shop vouchers, selected or recommended products must come from the same shop.
+For platform vouchers, same-shop is not required, but this component still needs
+the selected or recommended products to be relevant. Platform vouchers do not get
+a free progress point before product selection.
+
+### budget_recomputed_correct
+
+```text
+budget_recomputed_correct =
+  budget_attempted
+* budget_recomputation_supported
+* F1(selected_or_recommended_ids, gold_ids)
+```
+
+`budget_attempted` is true only when the trajectory contains an actual
+budget-like calculation, such as a `python_execute` call or state calculation
+that includes `product_ids` plus budget/voucher/price/total/payable evidence.
+Plain diagnostic printing is not a budget attempt.
+
+`budget_recomputation_supported` means the reward function can independently
+recompute prices, shop ids, voucher applicability, discount, payable total, and
+budget comparison from environment evidence or the product cache.
+
+Wrong product sets receive no budget recomputation credit even if their prices
+are known.
+
+### budget_numeric_alignment
+
+```text
+budget_numeric_alignment =
+  soft_match(model_claimed_total, recomputed_total)
+  and/or soft_match(model_claimed_payable, recomputed_payable)
+  and/or match(model_claimed_within_budget, recomputed_within_budget)
+```
+
+The reward reads budget-like `python_execute` outputs or compressed state. A
+numeric value receives full credit when it is exact or within 1%, half credit
+when it is within 5%, and zero otherwise. This makes budget calculation
+learnable before the model reaches exact final success.
+
+### within_budget_correct
+
+```text
+within_budget_correct =
+  1.0 if recomputed_payable_total(selected_or_recommended_ids) <= budget else 0.0
+```
+
+This value is multiplied by `F1(selected_or_recommended_ids, gold_ids)`. An
+affordable but irrelevant product set therefore receives zero credit.
+
+### recommend_gold_f1
+
+```text
+recommend_gold_f1 = F1(recommended_ids, gold_ids)
+```
+
+This is the main final-product shaping signal before exact success. F1 penalizes
+both missing gold products and recommending extra wrong products.
+
+### recommend_count_match
+
+```text
+recommend_count_match =
+  recommend_gold_f1 if len(recommended_ids) == len(gold_ids) else 0.0
+```
+
+This rewards trajectories that recommend the expected number of products. It
+helps distinguish a one-correct-item partial answer from a count-correct partial
+answer.
+
+### set_exact
+
+```text
+set_exact =
+  set(recommended_ids) == set(gold_ids)
+  and len(recommended_ids) == len(gold_ids)
+```
+
+Order is not required for this reward. ShoppingBench recommendations are product
+sets; using set equality gives a useful success signal even if the model orders
+the correct products differently.
+
+### terminate_quality
+
+```text
+terminate_quality =
+  recommend_gold_f1 if terminate_success and recommended_ids else 0.0
+```
+
+Terminate receives partial credit only when it follows a non-empty
+recommendation with gold overlap. Terminating without a recommendation is
+penalized.
+
+## 4. Outcome Reward
+
+Outcome reward is still strict, but it is now staged:
+
+```text
+exact_success = set_exact
+```
+
+```text
+budget_success =
+  exact_success
+  and recomputed_payable_total(recommended_ids) <= budget
+```
+
+Budget success is gated by exact product success. This prevents wrong but cheap
+recommendations from receiving outcome credit.
+
+```text
+final_success =
+  budget_success
+  and terminate_success
+```
+
+```text
+outcome =
+  0.25 * exact_success
++ 0.50 * budget_success
++ 1.50 * final_success
+```
+
+The model receives progressively larger outcome credit for exact product set,
+budget-valid set, and fully terminated success.
+
+## 5. State-Folded Rollout Support
+
+The reward parser supports both structured rollout messages and saved
+state-folded rollout text. For saved text, it can read:
+
+- assistant `<tool_call>...</tool_call>` blocks
+- compressed user `<state>...</state>` snapshots
+
+The state snapshots are used as product evidence for search candidates, viewed
+products, selected product ids, recommendations, terminations, voucher state, and
+budget candidates.
+
+This matters because eval rollout logs intentionally omit raw `<obs>` while
+keeping compressed state.
 
 ## 6. GRPO Reward Schedule
 
-During formal GRPO, the reward can include a small protocol component early in
-training:
+During formal GRPO, the scalar reward can include a small protocol component at
+the beginning:
 
 ```text
 grpo_reward =
@@ -318,17 +300,20 @@ grpo_reward =
 alpha(t) = max(0, alpha0 * (1 - step / warmup_steps))
 ```
 
-Example:
+Current RL default:
 
 ```text
-alpha0 = 0.3
-warmup_steps = first 10% of GRPO steps
+alpha0 = 0.0
+warmup_steps = 0
 ```
 
-Early GRPO:
+Protocol reward is disabled by default because SFT already learned most format
+and tool legality. The next RL run should optimize task reward directly.
+
+Earlier experimental schedule:
 
 ```text
-grpo_reward = 0.3 * protocol_reward + task_reward
+grpo_reward = 0.2 * protocol_reward + task_reward
 ```
 
 Late GRPO:
@@ -337,14 +322,35 @@ Late GRPO:
 grpo_reward = task_reward
 ```
 
-The reason for annealing is that protocol shaping is useful at the beginning to
-avoid format and tool-call collapse, but the final objective should be task
-correctness, not formatting.
+The protocol term is useful to prevent format/tool-call collapse. It should not
+be the final objective.
 
-## 7. Design Principle
+## 7. Validation
 
-Probe reward may inspect both protocol and task variance. Formal GRPO reward
-should prioritize correctness.
+This reward was tested on the real state-folded SFT checkpoint rollout:
 
-Do not reward a stage merely because it happened. Reward it only when it is
-supported by evidence and moves toward the correct ShoppingBench outcome.
+```text
+rollouts/sft_ckpt_probe_statefolded_4gpu_tp4_g4_20260620_0029
+```
+
+The final audit artifacts are:
+
+```text
+plots/task_reward_audit_statefolded_20260620_final.json
+plots/task_reward_audit_statefolded_20260620_final.csv
+```
+
+Audit result:
+
+```text
+rows: 256
+wrong_final_high_count: 0
+long_list_high_count: 0
+partial_signal_lost_count: 0
+old_wrong_final_high_count: 5
+```
+
+The old reward had five trajectories where the final recommendation had zero
+gold overlap but still received high task reward. The current reward removes
+those false positives while preserving positive shaping for correct partial
+search, selection, verification, budget calculation, and recommendation steps.

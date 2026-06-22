@@ -82,7 +82,7 @@ The probe separates protocol readiness from task-decision variance:
 
 ```text
 protocol = 0.5 * format + 0.5 * tool_valid
-task = progress + 2.0 * outcome - 0.02 * steps
+task = progress + 2.0 * exact_success + 1.0 * budget_success - 0.02 * steps
 total = protocol + task
 ```
 
@@ -106,7 +106,7 @@ Practically, the probe chooses among checkpoints with stable protocol behavior
 and prefers the one with stronger task-level variance. This is the checkpoint
 that should enter GRPO.
 
-## 4. GRPO Uses Query-Level Outcome Reward
+## 4. GRPO Uses Query-Level Task Reward
 
 For formal GRPO, use query-level RL:
 
@@ -130,28 +130,40 @@ The query-level reward is implemented in:
 src/rl/verl/utils/reward_score/shoppingbench_query.py
 ```
 
-Current reward:
+Current formal GRPO reward:
 
 ```text
 score =
-  0.25 * format_score
-+ 0.25 * count_score
-+ 2.00 * exact_score
-+ 1.00 * budget_score
-+ 0.25 * terminate_score
+  task_reward
++ protocol_weight * protocol_reward
+
+protocol_reward =
+  0.5 * format_valid
++ 0.5 * tool_valid
+
+task_reward =
+  progress
++ 2.0 * exact_success
++ 1.0 * budget_success
+- 0.02 * steps
 ```
 
 Component meanings:
 
-- `format_score`: valid `<think>` plus `<tool_call>` or `<response>` format.
-- `count_score`: recommended product count equals the gold product count.
-- `exact_score`: recommended product ids exactly match gold ids in order.
-- `budget_score`: predicted products satisfy voucher and budget constraints,
-  computed from the product cache.
-- `terminate_score`: model calls `terminate` with `status="success"`.
+- `protocol_weight`: starts small and linearly anneals to zero, so final GRPO
+  optimizes task correctness rather than protocol shaping.
+- `progress`: correctness-aware dense shaping over gold search recall, selected
+  gold overlap, same-shop correctness, verified selected gold products,
+  recomputed budget support, actual within-budget status, recommended gold
+  overlap, and terminate-after-valid-recommend.
+- `exact_success`: final recommended product ids exactly match gold ids in
+  order.
+- `budget_success`: final recommended products are within budget after
+  recomputing voucher application from observed product evidence or product
+  cache.
 
-This is final outcome-style reward for whole query trajectories. It is not the
-old step-level teacher-action imitation reward.
+This is whole-query task reward over complete multi-turn trajectories. It is
+not the old step-level teacher-action imitation reward.
 
 ## 5. Old Step-Level Reward Path
 
@@ -180,7 +192,7 @@ current training flow is:
 ```text
 QUERY_LEVEL_RL=1
 data_source=shoppingbench_query
-reward=final query-level outcome reward
+reward=query-level task reward with protocol annealing
 ```
 
 ## 6. One-Sentence Summary

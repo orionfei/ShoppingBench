@@ -179,6 +179,8 @@ def _parse_python_observation(results):
     if not isinstance(results, dict):
         return None
     observation = results.get("observation")
+    if observation is None:
+        observation = results.get("stdout")
     if not isinstance(observation, str):
         return None
     text = observation.strip()

@@ -76,9 +76,17 @@ class NaiveRewardManager:
 
             ground_truth = data_item.non_tensor_batch["reward_model"]["ground_truth"]
             data_source = data_item.non_tensor_batch[self.reward_fn_key]
-            extra_info = data_item.non_tensor_batch.get("extra_info", {})
+            extra_info = dict(data_item.non_tensor_batch.get("extra_info", {}) or {})
             num_turns = data_item.non_tensor_batch.get("__num_turns__", None)
             extra_info["num_turns"] = num_turns
+            if "messages" in data_item.non_tensor_batch:
+                extra_info["messages"] = data_item.non_tensor_batch["messages"]
+            if "reward_scores" in data_item.non_tensor_batch:
+                extra_info["rollout_reward_scores"] = data_item.non_tensor_batch["reward_scores"]
+            if "global_steps" in data.meta_info:
+                extra_info["global_step"] = data.meta_info["global_steps"]
+            if "total_training_steps" in data.meta_info:
+                extra_info["total_training_steps"] = data.meta_info["total_training_steps"]
 
             score = self.compute_score(
                 data_source=data_source,

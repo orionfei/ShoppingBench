@@ -21,7 +21,7 @@ Our SFT loss mask is role-based: only assistant messages are supervised. In the 
 `src/rl/run_grpo_qwen3_1_7b_query_verl.sh` follows Qwen's official Qwen3-1.7B verl GRPO example, then scales down for a single 32 GB GPU and longer ShoppingBench tool rollouts:
 
 - `adv_estimator=grpo`.
-- `lr=1e-6`, `use_kl_loss=True`, `kl_loss_coef=0.001`, `kl_loss_type=low_var_kl`.
+- `lr=1e-6`, `use_kl_loss=False` by default, with `kl_loss_coef=0.001` and `kl_loss_type=low_var_kl` kept for opt-in KL-loss experiments.
 - `ref.fsdp_config.param_offload=True` to reduce GPU pressure from the reference policy.
 - `rollout.name=vllm`, `rollout.mode=async`, `rollout.gpu_memory_utilization=0.6`.
 - `rollout.n=3` by default for group-relative rewards; use higher values when more GPUs are available.

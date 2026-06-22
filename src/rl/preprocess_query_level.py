@@ -2,6 +2,7 @@ import argparse
 from collections import Counter
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
@@ -10,6 +11,11 @@ from transformers import AutoTokenizer
 
 
 ROOT = Path(__file__).resolve().parents[2]
+AGENT_SRC = ROOT / "src" / "agent"
+if str(AGENT_SRC) not in sys.path:
+    sys.path.insert(0, str(AGENT_SRC))
+
+from toolkit import tools  # noqa: E402
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -29,45 +35,10 @@ def write_json(path: Path, payload: dict) -> None:
 
 
 def tool_schema_text() -> str:
-    tools = [
-        {
-            "name": "find_product",
-            "description": "Search for products and return up to 10 products, with each product including product_id, shop_id, title, price, service, and sold_count.",
-            "parameters": {
-                "q": "string, required. Search query.",
-                "page": "integer, required. Page number from 1 to 5.",
-                "shop_id": "string, optional. Restrict search to one shop.",
-                "price": "string, optional. Price range such as 0-100.",
-                "sort": "string, optional. One of priceasc, pricedesc, order, default.",
-                "service": "string, optional. One or more of official, freeShipping, COD, flashsale, default.",
-            },
-        },
-        {
-            "name": "view_product_information",
-            "description": "Fetch product descriptions, SKU options, and attributes for comma-separated product_ids.",
-            "parameters": {"product_ids": "string, required. Comma-separated product ids."},
-        },
-        {
-            "name": "recommend_product",
-            "description": "Recommend selected product ids to the user.",
-            "parameters": {"product_ids": "string, required. Comma-separated product ids in request order."},
-        },
-        {
-            "name": "python_execute",
-            "description": "Execute Python code string.",
-            "parameters": {"code": "string, required. Python code that prints results."},
-        },
-        {
-            "name": "terminate",
-            "description": "End the dialogue with success or failure.",
-            "parameters": {"status": "string, required. success or failure."},
-        },
-    ]
     lines = []
-    for idx, tool in enumerate(tools, 1):
-        lines.append(f"{idx}. Name: {tool['name']}")
-        lines.append(f"Description: {tool['description']}")
-        lines.append(f"Parameters: {json.dumps(tool['parameters'], ensure_ascii=False)}")
+    enabled_tools = [tool for tool in tools if tool.name != "web_search"]
+    for idx, tool in enumerate(enabled_tools, 1):
+        lines.append(f"{idx}. {tool.to_string()}")
         lines.append("")
     return "\n".join(lines).strip()
 

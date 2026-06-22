@@ -89,7 +89,17 @@ class DAPORewardManager:
 
             data_source = data_item.non_tensor_batch[self.reward_fn_key]
 
-            extra_info = data_item.non_tensor_batch.get("extra_info", None)
+            extra_info = dict(data_item.non_tensor_batch.get("extra_info", {}) or {})
+            if "messages" in data_item.non_tensor_batch:
+                extra_info["messages"] = data_item.non_tensor_batch["messages"]
+            if "reward_scores" in data_item.non_tensor_batch:
+                extra_info["rollout_reward_scores"] = data_item.non_tensor_batch["reward_scores"]
+            if "__num_turns__" in data_item.non_tensor_batch:
+                extra_info["num_turns"] = data_item.non_tensor_batch["__num_turns__"]
+            if "global_steps" in data.meta_info:
+                extra_info["global_step"] = data.meta_info["global_steps"]
+            if "total_training_steps" in data.meta_info:
+                extra_info["total_training_steps"] = data.meta_info["total_training_steps"]
 
             result = self.compute_score(
                 data_source=data_source,

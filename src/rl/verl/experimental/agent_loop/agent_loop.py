@@ -118,6 +118,7 @@ class AgentLoopOutput(BaseModel):
     response_mask: list[int]
     num_turns: int = 0
     metrics: AgentLoopMetrics
+    messages: list[dict[str, Any]] | None = None
 
 
 class AgentLoopBase(ABC):
@@ -347,7 +348,13 @@ class AgentLoopWorker:
 
         num_turns = np.array([input.num_turns for input in inputs], dtype=np.int32)
         metrics = [input.metrics.model_dump() for input in inputs]
-        return DataProto(batch=batch, non_tensor_batch={"__num_turns__": num_turns}, meta_info={"metrics": metrics})
+        non_tensor_batch = {"__num_turns__": num_turns}
+        if any(input.messages is not None for input in inputs):
+            messages = np.empty(len(inputs), dtype=object)
+            for idx, input in enumerate(inputs):
+                messages[idx] = input.messages or []
+            non_tensor_batch["messages"] = messages
+        return DataProto(batch=batch, non_tensor_batch=non_tensor_batch, meta_info={"metrics": metrics})
 
 
 async def get_trajectory_info(step, index):

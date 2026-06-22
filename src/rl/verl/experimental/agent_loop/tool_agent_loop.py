@@ -15,7 +15,9 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -26,6 +28,13 @@ from verl.experimental.agent_loop.agent_loop import AgentLoopBase, AgentLoopOutp
 from verl.tools.utils.tool_registry import initialize_tools_from_config
 from verl.utils.profiler import simple_timer
 from verl.utils.rollout_trace import rollout_trace_op
+
+AGENT_SRC = Path(__file__).resolve().parents[4] / "agent"
+if str(AGENT_SRC) not in sys.path:
+    sys.path.insert(0, str(AGENT_SRC))
+
+from util.history_compression import build_state_folded_user_prompt  # noqa: E402
+from util.message import ASSISTANT_ROLES, USER_ROLES, Message, generate_tool_call_id  # noqa: E402
 
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
@@ -146,18 +155,25 @@ class ToolAgentLoop(AgentLoopBase):
         cls.prompt_length = config.actor_rollout_ref.rollout.prompt_length
         cls.response_length = config.actor_rollout_ref.rollout.response_length
         cls.system_prompt = tokenizer.apply_chat_template([{}], add_generation_prompt=False, tokenize=True)
+        cls.state_max_candidates_per_search = config.actor_rollout_ref.rollout.multi_turn.get(
+            "state_max_candidates_per_search", 10
+        )
 
     @rollout_trace_op
     async def run(self, messages: list[dict[str, Any]], sampling_params: dict[str, Any]) -> AgentLoopOutput:
         metrics = {}
         request_id = uuid4().hex
+        system_message = self._system_message(messages)
+        query = self._initial_user_query(messages)
+        history_messages = [Message(user=query).to_string(USER_ROLES)]
+        user_prompt = build_state_folded_user_prompt(history_messages, self.state_max_candidates_per_search)
+        current_messages = [system_message, {"role": "user", "content": user_prompt}]
         prompt_ids = await self.loop.run_in_executor(
             None,
-            lambda: self.tokenizer.apply_chat_template(
-                messages, tools=self.tool_schemas, add_generation_prompt=True, tokenize=True
-            ),
+            lambda: self.tokenizer.apply_chat_template(current_messages, add_generation_prompt=True, tokenize=True),
         )
         response_mask = []
+        rollout_messages: list[dict[str, Any]] = [*current_messages]
 
         user_turns, assistant_turns = 0, 0
         while True:
@@ -182,35 +198,62 @@ class ToolAgentLoop(AgentLoopBase):
                 break
 
             # no tool calls
+            assistant_text = await self.loop.run_in_executor(None, self.tokenizer.decode, response_ids)
             tool_calls = await self.tool_parser.extract_tool_calls(response_ids)
+            assistant_record = {"role": "assistant", "content": assistant_text}
             if not tool_calls:
+                rollout_messages.append(assistant_record)
                 break
+
+            normalized_calls = self._normalize_tool_calls(tool_calls[: self.max_parallel_calls])
+            assistant_record["tool_calls"] = [
+                {"name": item["name"], "parameters": item["parameters"]} for item in normalized_calls
+            ]
+            rollout_messages.append(assistant_record)
 
             # call tools
             tasks = []
-            for tool_call in tool_calls[: self.max_parallel_calls]:
+            for tool_call in normalized_calls:
                 tasks.append(self._call_tool(tool_call))
             with simple_timer("tool_calls", metrics):
                 tool_responses = await asyncio.gather(*tasks)
             if any(isinstance(item, Exception) for item in tool_responses):
                 break
 
-            # append tool_response_ids
-            tool_response_ids = await self.loop.run_in_executor(
+            history_messages.append(
+                self._assistant_history_message(
+                    assistant_text=assistant_text,
+                    normalized_calls=normalized_calls,
+                    tool_results=tool_responses,
+                )
+            )
+            for item in tool_responses:
+                rollout_messages.append({"role": "user", "content": f"<obs>{item['tool_response']}</obs>"})
+
+            if any(item["name"] == "terminate" for item in normalized_calls):
+                break
+
+            next_user_prompt = build_state_folded_user_prompt(
+                history_messages,
+                self.state_max_candidates_per_search,
+            )
+            state_prompt_ids = await self.loop.run_in_executor(
                 None,
-                lambda messages=tool_responses: self.tokenizer.apply_chat_template(
-                    messages, add_generation_prompt=True, tokenize=True
+                lambda: self.tokenizer.apply_chat_template(
+                    [{"role": "user", "content": next_user_prompt}],
+                    add_generation_prompt=True,
+                    tokenize=True,
                 ),
             )
-            tool_response_ids = tool_response_ids[len(self.system_prompt) :]
 
             # NOTE: last turn should not be user turn, or the EOS token reward
             # can't be propagated to previous token in GAE.
-            if len(response_mask) + len(tool_response_ids) >= self.response_length:
+            if len(response_mask) + len(state_prompt_ids) >= self.response_length:
                 break
 
-            prompt_ids += tool_response_ids
-            response_mask += [0] * len(tool_response_ids)
+            prompt_ids += state_prompt_ids
+            response_mask += [0] * len(state_prompt_ids)
+            rollout_messages.append({"role": "user", "content": next_user_prompt})
             user_turns += 1
 
         response_ids = prompt_ids[-len(response_mask) :]
@@ -222,16 +265,99 @@ class ToolAgentLoop(AgentLoopBase):
             response_mask=response_mask[: self.response_length],
             num_turns=user_turns + assistant_turns + 1,
             metrics=metrics,
+            messages=rollout_messages,
         )
         return output
 
-    async def _call_tool(self, tool_call: FunctionCall) -> dict[str, str]:
+    @staticmethod
+    def _system_message(messages: list[dict[str, Any]]) -> dict[str, str]:
+        for message in messages:
+            if message.get("role") == "system":
+                return {"role": "system", "content": str(message.get("content") or "")}
+        return {"role": "system", "content": ""}
+
+    @staticmethod
+    def _initial_user_query(messages: list[dict[str, Any]]) -> str:
+        content = ""
+        for message in messages:
+            if message.get("role") == "user":
+                content = str(message.get("content") or "")
+                break
+        match = re.search(r"<user>(.*?)</user>", content, flags=re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        return content.strip()
+
+    @staticmethod
+    def _extract_role_text(text: str, role: str) -> str:
+        match = re.search(rf"<{role}>(.*?)</{role}>", text or "", flags=re.DOTALL)
+        return match.group(1).strip() if match else ""
+
+    @staticmethod
+    def _parse_tool_response(tool_response: str):
+        try:
+            return json.loads(tool_response)
+        except Exception:
+            return tool_response
+
+    @staticmethod
+    def _unique_tool_call_id(name: str, parameters: dict[str, Any], used_ids: set[str]) -> str:
+        base_id = generate_tool_call_id(name, parameters)
+        tool_call_id = base_id
+        suffix = 1
+        while tool_call_id in used_ids:
+            suffix += 1
+            tool_call_id = f"{base_id}_{suffix}"
+        used_ids.add(tool_call_id)
+        return tool_call_id
+
+    def _normalize_tool_calls(self, tool_calls: list[FunctionCall]) -> list[dict[str, Any]]:
+        normalized = []
+        used_ids: set[str] = set()
+        for tool_call in tool_calls:
+            try:
+                parameters = json.loads(tool_call.arguments)
+            except Exception:
+                parameters = {}
+            if not isinstance(parameters, dict):
+                parameters = {}
+            normalized.append(
+                {
+                    "name": tool_call.name,
+                    "parameters": parameters,
+                    "tool_call_id": self._unique_tool_call_id(tool_call.name, parameters, used_ids),
+                }
+            )
+        return normalized
+
+    def _assistant_history_message(
+        self,
+        assistant_text: str,
+        normalized_calls: list[dict[str, Any]],
+        tool_results: list[dict[str, Any]],
+    ) -> str:
+        obs = [
+            {
+                "tool_call_id": call["tool_call_id"],
+                "results": result["result"],
+            }
+            for call, result in zip(normalized_calls, tool_results, strict=False)
+        ]
+        message = Message(
+            think=self._extract_role_text(assistant_text, "think"),
+            tool_call=normalized_calls,
+            obs=obs,
+            response=self._extract_role_text(assistant_text, "response"),
+        )
+        return message.to_string(ASSISTANT_ROLES)
+
+    async def _call_tool(self, tool_call: dict[str, Any]) -> dict[str, Any]:
         """Call tool and return tool response."""
         tool, instance_id = None, None
         try:
             # TODO: append malformed tool_call to the prompt: invalid function name or arguments
-            tool_name = tool_call.name
-            tool_args = json.loads(tool_call.arguments)
+            tool_name = tool_call["name"]
+            tool_args = tool_call["parameters"]
             tool = self.tools[tool_name]
 
             instance_id = await tool.create()
@@ -243,23 +369,12 @@ class ToolAgentLoop(AgentLoopBase):
             if tool and instance_id:
                 await tool.release(instance_id)
 
-        if len(tool_response) > self.max_tool_response_length:
-            if self.tool_response_truncate_side == "left":
-                tool_response = tool_response[: self.max_tool_response_length] + "...(truncated)"
-            elif self.tool_response_truncate_side == "right":
-                tool_response = "(truncated)..." + tool_response[-self.max_tool_response_length :]
-            else:
-                length = self.max_tool_response_length // 2
-                tool_response = tool_response[:length] + "...(truncated)..." + tool_response[-length:]
-
-        if self.config.actor_rollout_ref.rollout.multi_turn.format == "shoppingbench_xml":
-            return {
-                "role": "user",
-                "content": f"<obs>{tool_response}</obs>",
-            }
         return {
-            "role": "tool",
-            "content": tool_response,
+            "tool_call_id": tool_call["tool_call_id"],
+            "name": tool_call["name"],
+            "parameters": tool_call["parameters"],
+            "tool_response": tool_response,
+            "result": self._parse_tool_response(tool_response),
         }
 
     @classmethod
