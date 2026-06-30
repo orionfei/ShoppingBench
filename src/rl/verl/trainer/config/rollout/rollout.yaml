@@ -134,6 +134,14 @@ multi_turn:
   # max length of tool response
   max_tool_response_length: 256
 
+  # ShoppingBench state-folded history controls.
+  state_max_candidates_per_search: 10
+  state_max_searches: null
+  state_max_budget_candidates: null
+  state_max_viewed_products: null
+  state_never_expand: False
+  state_min_char_saving: 0.0
+
   # truncate side of tool response: left, middle, right
   tool_response_truncate_side: middle
 

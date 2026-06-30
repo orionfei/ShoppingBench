@@ -1,5 +1,5 @@
 ### model
-model_name_or_path: /home/wangjiangyuan.wjy/model/Qwen/Qwen3-1.7B
+model_name_or_path: /root/project/ShoppingBench/model/Qwen3-4B
 template: qwen3
 trust_remote_code: true
 
@@ -19,7 +19,7 @@ dataloader_num_workers: 8
 packing: true
 
 ### output
-output_dir: saves/qwen3-1.7b/full/sft_teacher_voucher_clean691
+output_dir: saves/qwen3-4b/full/sft_teacher_voucher_clean691
 logging_steps: 0.01
 save_steps: 0.25
 plot_loss: true

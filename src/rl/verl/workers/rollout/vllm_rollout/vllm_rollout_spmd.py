@@ -458,7 +458,9 @@ class vLLMAsyncRollout:
 
     def init_worker(self, all_kwargs: list[dict[str, Any]]):
         """Initialize worker engine."""
-        all_kwargs[0]["rank"] = int(os.environ["RANK"])
+        train_rank = int(os.environ["RANK"])
+        tp_size = int(self.config.tensor_model_parallel_size)
+        all_kwargs[0]["rank"] = train_rank % tp_size
         all_kwargs[0]["local_rank"] = 0
 
         self.vllm_config = all_kwargs[0]["vllm_config"]

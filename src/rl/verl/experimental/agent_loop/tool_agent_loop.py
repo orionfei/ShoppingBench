@@ -158,6 +158,21 @@ class ToolAgentLoop(AgentLoopBase):
         cls.state_max_candidates_per_search = config.actor_rollout_ref.rollout.multi_turn.get(
             "state_max_candidates_per_search", 10
         )
+        cls.state_max_searches = config.actor_rollout_ref.rollout.multi_turn.get(
+            "state_max_searches", None
+        )
+        cls.state_max_budget_candidates = config.actor_rollout_ref.rollout.multi_turn.get(
+            "state_max_budget_candidates", None
+        )
+        cls.state_max_viewed_products = config.actor_rollout_ref.rollout.multi_turn.get(
+            "state_max_viewed_products", None
+        )
+        cls.state_never_expand = config.actor_rollout_ref.rollout.multi_turn.get(
+            "state_never_expand", False
+        )
+        cls.state_min_char_saving = config.actor_rollout_ref.rollout.multi_turn.get(
+            "state_min_char_saving", 0.0
+        )
 
     @rollout_trace_op
     async def run(self, messages: list[dict[str, Any]], sampling_params: dict[str, Any]) -> AgentLoopOutput:
@@ -166,7 +181,15 @@ class ToolAgentLoop(AgentLoopBase):
         system_message = self._system_message(messages)
         query = self._initial_user_query(messages)
         history_messages = [Message(user=query).to_string(USER_ROLES)]
-        user_prompt = build_state_folded_user_prompt(history_messages, self.state_max_candidates_per_search)
+        user_prompt = build_state_folded_user_prompt(
+            history_messages,
+            self.state_max_candidates_per_search,
+            max_searches=self.state_max_searches,
+            max_budget_candidates=self.state_max_budget_candidates,
+            max_viewed_products=self.state_max_viewed_products,
+            never_expand=self.state_never_expand,
+            min_char_saving_for_state=self.state_min_char_saving,
+        )
         current_messages = [system_message, {"role": "user", "content": user_prompt}]
         prompt_ids = await self.loop.run_in_executor(
             None,
@@ -236,6 +259,11 @@ class ToolAgentLoop(AgentLoopBase):
             next_user_prompt = build_state_folded_user_prompt(
                 history_messages,
                 self.state_max_candidates_per_search,
+                max_searches=self.state_max_searches,
+                max_budget_candidates=self.state_max_budget_candidates,
+                max_viewed_products=self.state_max_viewed_products,
+                never_expand=self.state_never_expand,
+                min_char_saving_for_state=self.state_min_char_saving,
             )
             state_prompt_ids = await self.loop.run_in_executor(
                 None,

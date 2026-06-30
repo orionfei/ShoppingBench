@@ -1,0 +1,26 @@
+{
+    "task": "voucher",
+    "system_prompt_file": "src/agent/prompt/rollout.md",
+    "synthesize_file": "data/synthesize_voucher_test.jsonl",
+    "rollout_file": "data/rollout_voucher_sft_qwen3-4b_step256_state_folded_test.jsonl",
+    "threads": 8,
+    "base_url": "http://127.0.0.1:30000/v1",
+    "api_key": "EMPTY",
+    "history_compression": "state_folded",
+    "state_max_candidates_per_search": 10,
+    "state_max_searches": 12,
+    "state_max_budget_candidates": 120,
+    "state_max_viewed_products": 40,
+    "state_never_expand": true,
+    "state_min_char_saving": 0.1,
+    "stop_after_recommend": true,
+    "model_config": {
+        "model": "qwen3-4b-sft-step256",
+        "temperature": 0,
+        "max_tokens": 2048,
+        "stream": true,
+        "extra_body": {
+            "enable_thinking": false
+        }
+    }
+}

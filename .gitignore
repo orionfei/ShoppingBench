@@ -83,6 +83,10 @@ data/tmp/
 data/tmp_*
 dataset/probe/
 dataset/shoppingbench_query/train_sft_overlap_300.parquet
+dataset/shoppingbench_sft_state_folded*/
+dataset/shoppingbench_sft_state_folded_single_action*/
+dataset/shoppingbench_sft_state_folded_single_action_viewshortlist*/
+reports/
 config/tmp/
 resources/*.jsonl
 resources/documents.jsonl

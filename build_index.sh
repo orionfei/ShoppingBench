@@ -1,5 +1,6 @@
-products_filepath="data/products-large.jsonl"
-documents_filepath="resources/documents.jsonl"
+products_filepath="${PRODUCTS_FILE:-data/products-large.jsonl}"
+documents_filepath="${DOCUMENTS_FILE:-resources/documents.jsonl}"
+index_dir="${INDEX_DIR:-indexes}"
 index_input_dir="${INDEX_INPUT_DIR:-resources/index_input}"
 
 export OPENAI_API_KEY="${OPENAI_API_KEY:-EMPTY}"
@@ -17,15 +18,15 @@ export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:--Xmx8g -XX:MaxRAMPercentage=25}"
 #fi
 
 # build indexes
-rm -rf indexes
-mkdir -p indexes
+rm -rf "$index_dir"
+mkdir -p "$index_dir"
 rm -rf "$index_input_dir"
 mkdir -p "$index_input_dir"
 ln -s "$(realpath "$documents_filepath")" "$index_input_dir/documents.jsonl"
 python -m pyserini.index.lucene \
   --collection JsonCollection \
   --input "$index_input_dir" \
-  --index indexes \
+  --index "$index_dir" \
   --generator DefaultLuceneDocumentGenerator \
   --threads 1 \
   --storePositions --storeDocvectors --storeRaw

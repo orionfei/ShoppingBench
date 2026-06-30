@@ -1,5 +1,9 @@
 import re
-import ujson as json
+
+try:
+    import ujson as json
+except ModuleNotFoundError:
+    import json
 
 
 USER_RE = re.compile(r"<user>(.*?)</user>", re.DOTALL)
@@ -210,6 +214,205 @@ def _budget_status(calculation) -> bool | None:
     return None
 
 
+def _has_verified_details_for_all(state: dict, selected_product_ids: list[str]) -> bool:
+    if not selected_product_ids:
+        return False
+    viewed_products = state.get("viewed_products")
+    verified_details = state.get("verified_details")
+    detail_items = []
+    if isinstance(viewed_products, list):
+        detail_items.extend(viewed_products)
+    if isinstance(verified_details, list):
+        detail_items.extend(verified_details)
+    detailed_ids = {
+        str(item.get("product_id"))
+        for item in detail_items
+        if isinstance(item, dict) and item.get("product_id") is not None
+    }
+    return all(pid in detailed_ids for pid in selected_product_ids)
+
+
+def _search_signature(search: dict) -> str:
+    if not isinstance(search, dict):
+        return ""
+    params = search.get("parameters") or {}
+    if not isinstance(params, dict):
+        return ""
+    normalized = {
+        key: str(params.get(key, "")).strip().lower()
+        for key in ("q", "page", "shop_id", "price", "sort", "service")
+        if params.get(key) not in (None, "", "default")
+    }
+    return json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _search_repetition_summary(searches: list[dict]) -> dict:
+    signatures = []
+    repeated = []
+    seen = set()
+    for search in searches:
+        signature = _search_signature(search)
+        if not signature:
+            continue
+        signatures.append(signature)
+        if signature in seen and signature not in repeated:
+            repeated.append(signature)
+        seen.add(signature)
+    return {
+        "total_searches": len(signatures),
+        "unique_searches": len(set(signatures)),
+        "repeated_searches": repeated,
+        "has_repeated_search": bool(repeated),
+    }
+
+
+def _state_decision_hint(state: dict) -> dict:
+    selected_product_ids = [
+        str(pid)
+        for pid in state.get("selected_product_ids", [])
+        if pid is not None
+    ]
+    recommendations = state.get("recommendations")
+    has_recommendations = bool(recommendations)
+    if not has_recommendations:
+        has_recommendations = bool(state.get("recommended_product_ids"))
+
+    searches = state.get("searches") or []
+    observed_counts = state.get("observed_counts") or {}
+    has_search_evidence = bool(searches)
+    if isinstance(observed_counts, dict):
+        has_search_evidence = has_search_evidence or bool(
+            observed_counts.get("find_product_candidates")
+        )
+
+    latest_budget_calculation = state.get("latest_budget_calculation")
+    budget_calculation_trusted = state.get("budget_calculation_trusted")
+    if budget_calculation_trusted is not False:
+        budget_status = _budget_status(latest_budget_calculation)
+    else:
+        budget_status = None
+    if budget_status is None and isinstance(state.get("within_budget_if_now"), bool):
+        budget_status = state.get("within_budget_if_now")
+
+    has_budget_evidence = isinstance(latest_budget_calculation, dict)
+    details_complete = _has_verified_details_for_all(state, selected_product_ids)
+
+    if has_recommendations:
+        return {
+            "summary": "A product recommendation has already been sent.",
+            "allowed_next_tools": ["terminate"],
+            "notes": ["End the dialogue after confirming whether the task is complete."],
+        }
+    if selected_product_ids:
+        if has_budget_evidence and budget_status is False:
+            return {
+                "summary": "The current selected products do not satisfy the voucher budget.",
+                "allowed_next_tools": [
+                    "find_product",
+                    "view_product_information",
+                    "python_execute",
+                    "terminate",
+                ],
+                "notes": [
+                    "Revise the product set using observed candidates or finish with failure if no valid set remains."
+                ],
+            }
+        if not details_complete and not has_budget_evidence:
+            return {
+                "summary": "Products have been selected but still need detail verification and voucher-budget calculation.",
+                "allowed_next_tools": ["view_product_information", "python_execute"],
+                "notes": ["Verify selected product ids before recommending."],
+            }
+        if not details_complete:
+            return {
+                "summary": "Products have been selected but product details are still missing.",
+                "allowed_next_tools": ["view_product_information", "python_execute"],
+                "notes": ["Check attributes, SKU options, and service constraints."],
+            }
+        if not has_budget_evidence or budget_calculation_trusted is False:
+            return {
+                "summary": "Products have been selected and need a trustworthy voucher-budget calculation.",
+                "allowed_next_tools": ["python_execute"],
+                "notes": ["Calculate total price, voucher eligibility, payable total, and budget status."],
+            }
+        if budget_status is True:
+            return {
+                "summary": "The selected products have verified details and satisfy the voucher budget.",
+                "allowed_next_tools": ["recommend_product", "terminate"],
+                "notes": ["Recommend the selected product ids in the user's requested order."],
+            }
+        return {
+            "summary": "The selected products need a final voucher-budget decision.",
+            "allowed_next_tools": ["python_execute", "recommend_product", "terminate"],
+            "notes": ["Use the calculation result to decide whether recommendation is valid."],
+        }
+    if state.get("requested_view_product_ids"):
+        return {
+            "summary": "Product details have been requested for candidate products.",
+            "allowed_next_tools": ["python_execute"],
+            "notes": ["Use product details and prices to compute voucher budget before recommending."],
+        }
+    if has_search_evidence:
+        repetition = state.get("search_repetition")
+        if not isinstance(repetition, dict):
+            repetition = _search_repetition_summary(searches)
+        if repetition.get("has_repeated_search"):
+            return {
+                "summary": "Search results are already available and a search has been repeated.",
+                "allowed_next_tools": [
+                    "view_product_information",
+                    "python_execute",
+                ],
+                "conditional_next_tools": [
+                    {
+                        "tool": "find_product",
+                        "when": "Only if a required item has no plausible retained candidate, and the new search must change q, page, shop_id, price, sort, or service.",
+                    }
+                ],
+                "notes": [
+                    "Do not repeat an identical find_product call.",
+                    "Select visible candidate product ids first, then verify details and compute voucher budget.",
+                ],
+            }
+        return {
+            "summary": "Search results are available but no product set has been selected yet.",
+            "allowed_next_tools": [
+                "view_product_information",
+                "python_execute",
+            ],
+            "conditional_next_tools": [
+                {
+                    "tool": "find_product",
+                    "when": "Only if a required item has no plausible retained candidate, and the new search must change q, page, shop_id, price, sort, or service.",
+                }
+            ],
+            "notes": [
+                "Choose candidate product ids that match the user request before searching again.",
+                "Do not repeat an identical find_product call.",
+                "Verify selected ids and compute voucher budget before recommending.",
+            ],
+        }
+    return {
+        "summary": "No product evidence has been collected yet.",
+        "allowed_next_tools": ["find_product"],
+        "notes": ["Search for products matching each requested item."],
+    }
+
+
+def normalize_state_schema(state: dict) -> dict:
+    """Return the canonical state-folded schema used by SFT and online rollout."""
+    if not isinstance(state, dict):
+        return state
+    normalized = dict(state)
+    normalized.pop("pending", None)
+    normalized.pop("decision_hint", None)
+    searches = normalized.get("searches") or []
+    if isinstance(searches, list):
+        normalized["search_repetition"] = _search_repetition_summary(searches)
+    normalized["decision_hint"] = _state_decision_hint(normalized)
+    return normalized
+
+
 def _close_amount(left, right) -> bool:
     try:
         return abs(float(left) - float(right)) <= 0.01
@@ -226,6 +429,69 @@ def _budget_lookup(budget_candidates: list[dict]) -> dict[str, dict]:
         if product_id not in lookup:
             lookup[product_id] = candidate
     return lookup
+
+
+def _positive_int_or_none(value):
+    if value is None:
+        return None
+    try:
+        value = int(value)
+    except Exception:
+        return None
+    return value if value > 0 else None
+
+
+def _cap_recent(items: list, max_items: int | None):
+    max_items = _positive_int_or_none(max_items)
+    if max_items is None or len(items) <= max_items:
+        return items
+    return items[-max_items:]
+
+
+def _cap_by_product_id_priority(
+    items: list[dict],
+    max_items: int | None,
+    priority_product_ids: list[str],
+) -> list[dict]:
+    max_items = _positive_int_or_none(max_items)
+    if max_items is None or len(items) <= max_items:
+        return items
+
+    priority = [str(pid) for pid in priority_product_ids if pid is not None]
+    selected = []
+    selected_ids = set()
+
+    for pid in priority:
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            product_id = item.get("product_id")
+            if product_id is None or str(product_id) != pid or str(product_id) in selected_ids:
+                continue
+            selected.append(item)
+            selected_ids.add(str(product_id))
+            break
+        if len(selected) >= max_items:
+            return selected
+
+    for item in reversed(items):
+        if not isinstance(item, dict):
+            continue
+        product_id = item.get("product_id")
+        if product_id is not None and str(product_id) in selected_ids:
+            continue
+        selected.append(item)
+        if product_id is not None:
+            selected_ids.add(str(product_id))
+        if len(selected) >= max_items:
+            break
+
+    selected.reverse()
+    priority_order = {pid: idx for idx, pid in enumerate(priority)}
+    return sorted(
+        selected,
+        key=lambda item: priority_order.get(str(item.get("product_id")), len(priority_order)),
+    )
 
 
 def _budget_calculation_trusted(
@@ -332,6 +598,9 @@ def _discounted_total(
 def build_state_from_history(
     history_messages: list[str],
     max_candidates_per_search: int = 10,
+    max_searches: int | None = None,
+    max_budget_candidates: int | None = None,
+    max_viewed_products: int | None = None,
 ) -> dict:
     query = _first_user_message(history_messages)
     voucher = parse_voucher_from_query(query)
@@ -498,42 +767,7 @@ def build_state_from_history(
     if payable_total is not None:
         payable_total = round(payable_total, 2)
 
-    pending = []
-    if recommendations:
-        pending.append("terminate_if_not_done")
-    elif selected_product_ids:
-        missing_details = [
-            pid for pid in selected_product_ids if pid not in viewed_products
-        ]
-        if budget_calculations:
-            budget_status = (
-                _budget_status(budget_calculations[-1])
-                if budget_calculation_trusted
-                else None
-            )
-        else:
-            budget_status = None
-
-        if budget_calculations and not budget_calculation_trusted:
-            pending.append("check_voucher_budget")
-        elif budget_status is False:
-            pending.append("revise_selection_or_fail")
-        elif missing_details:
-            pending.append("verify_product_information")
-            if not budget_calculations:
-                pending.append("check_voucher_budget")
-        elif budget_status is True:
-            pending.append("recommend_products")
-        else:
-            pending.append("check_voucher_budget")
-    elif requested_view_product_ids:
-        pending.append("check_voucher_budget")
-    elif searches:
-        pending.append("select_candidates_from_search_results")
-    else:
-        pending.append("search_products")
-
-    return {
+    state = {
         "task_type": "voucher_budget",
         "voucher": {
             "scope": voucher.get("scope"),
@@ -542,9 +776,16 @@ def build_state_from_history(
             "discount": voucher.get("discount"),
             "parse_ok": voucher.get("parse_ok"),
         },
-        "searches": searches,
-        "budget_candidates": budget_candidates,
-        "requested_view_product_ids": requested_view_product_ids,
+        "searches": _cap_recent(searches, max_searches),
+        "budget_candidates": _cap_by_product_id_priority(
+            budget_candidates,
+            max_budget_candidates,
+            selected_product_ids,
+        ),
+        "requested_view_product_ids": _cap_recent(
+            requested_view_product_ids,
+            max_viewed_products,
+        ),
         "selected_product_ids": selected_product_ids,
         "selected_total_before_voucher": selected_total,
         "shop_anchor": next(iter(selected_shop_ids), None)
@@ -561,27 +802,52 @@ def build_state_from_history(
         and payable_total is not None
         and voucher.get("budget") is not None
         else None,
-        "viewed_products": list(viewed_products.values()),
+        "viewed_products": _cap_by_product_id_priority(
+            list(viewed_products.values()),
+            max_viewed_products,
+            selected_product_ids,
+        ),
         "latest_budget_calculation": latest_budget_calculation,
         "budget_calculation_trusted": budget_calculation_trusted,
         "recommendations": recommendations,
         "terminations": terminations,
-        "pending": pending,
     }
+    return normalize_state_schema(state)
 
 
 def build_state_folded_user_prompt(
     history_messages: list[str],
     max_candidates_per_search: int = 10,
+    max_searches: int | None = None,
+    max_budget_candidates: int | None = None,
+    max_viewed_products: int | None = None,
+    never_expand: bool = False,
+    min_char_saving_for_state: float = 0.0,
 ) -> str:
     query = _first_user_message(history_messages)
+    raw_prompt = "# Dialogue Records History\n" + "\n\n".join(history_messages)
     parts = [f"<user>{query}</user>"]
     has_assistant_history = any("<tool_call>" in item or "<response>" in item for item in history_messages)
     if has_assistant_history:
-        state = build_state_from_history(history_messages, max_candidates_per_search)
+        state = build_state_from_history(
+            history_messages,
+            max_candidates_per_search,
+            max_searches=max_searches,
+            max_budget_candidates=max_budget_candidates,
+            max_viewed_products=max_viewed_products,
+        )
         parts.append(
             "<state>"
             + json.dumps(state, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
             + "</state>"
         )
-    return "# Dialogue Records History\n" + "\n\n".join(parts)
+    folded_prompt = "# Dialogue Records History\n" + "\n\n".join(parts)
+    if never_expand:
+        try:
+            min_char_saving_for_state = float(min_char_saving_for_state)
+        except Exception:
+            min_char_saving_for_state = 0.0
+        max_folded_chars = len(raw_prompt) * max(0.0, 1.0 - min_char_saving_for_state)
+        if len(folded_prompt) > max_folded_chars:
+            return raw_prompt
+    return folded_prompt

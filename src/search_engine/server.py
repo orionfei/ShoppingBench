@@ -15,7 +15,7 @@ from pyserini.search.lucene import LuceneSearcher
 from flask import Flask, request, jsonify
 from waitress import serve
 
-searcher = LuceneSearcher("indexes")
+searcher = LuceneSearcher(os.getenv("INDEX_DIR", "indexes"))
 print("Load indexes done.", file=sys.stderr)
 
 app = Flask(__name__)

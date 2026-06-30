@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-CHECKPOINT_ROOT="${1:-${CHECKPOINT_ROOT:-checkpoints/shoppingbench-sft/qwen3-1.7b_state_folded_verl}}"
+CHECKPOINT_ROOT="${1:-${CHECKPOINT_ROOT:-checkpoints/shoppingbench-sft/qwen3-4b_state_folded_verl}}"
 OUT_ROOT="${OUT_ROOT:-rollouts/sft_checkpoint_reward_variance}"
 QUERY_VAL_FILES="${QUERY_VAL_FILES:-dataset/shoppingbench_query/test.parquet}"
 ROLLOUT_N="${ROLLOUT_N:-8}"

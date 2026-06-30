@@ -696,6 +696,117 @@ def _same_shop_correct(product_ids: list[str], products_by_id: dict[str, dict], 
     return 1.0 if len(shop_ids) == 1 else 0.0
 
 
+def _norm_text(value) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+
+def _flatten_gold_attributes(gold_item: dict[str, Any]) -> list[tuple[str, str]]:
+    requirements: list[tuple[str, str]] = []
+    raw_attributes = gold_item.get("attributes") or []
+    if isinstance(raw_attributes, dict):
+        raw_attributes = [raw_attributes]
+    for group in raw_attributes:
+        if not isinstance(group, dict):
+            continue
+        for key, values in group.items():
+            if not isinstance(values, list | tuple | set):
+                values = [values]
+            for value in values:
+                normalized = _norm_text(value)
+                if normalized:
+                    requirements.append((str(key), normalized))
+    return requirements
+
+
+def _flatten_gold_sku_values(gold_item: dict[str, Any]) -> list[str]:
+    values: list[str] = []
+    raw_skus = gold_item.get("sku_options") or []
+    if isinstance(raw_skus, dict):
+        raw_skus = [raw_skus]
+    for sku in raw_skus:
+        if not isinstance(sku, dict):
+            continue
+        for value in sku.values():
+            normalized = _norm_text(value)
+            if normalized:
+                values.append(normalized)
+    return values
+
+
+def _candidate_attribute_values(product: dict[str, Any], key: str) -> set[str]:
+    attributes = product.get("attributes") or {}
+    if not isinstance(attributes, dict):
+        return set()
+    values = attributes.get(key)
+    if not isinstance(values, list | tuple | set):
+        values = [values] if values is not None else []
+    return {_norm_text(value) for value in values if _norm_text(value)}
+
+
+def _candidate_sku_values(product: dict[str, Any]) -> set[str]:
+    raw_skus = product.get("sku_options") or {}
+    if isinstance(raw_skus, dict):
+        raw_skus = raw_skus.values()
+    values: set[str] = set()
+    for sku in raw_skus or []:
+        if not isinstance(sku, dict):
+            continue
+        for value in sku.values():
+            normalized = _norm_text(value)
+            if normalized:
+                values.add(normalized)
+    return values
+
+
+def _matches_gold_item_by_attributes(product: dict[str, Any], gold_item: dict[str, Any]) -> bool:
+    if not isinstance(product, dict) or not isinstance(gold_item, dict):
+        return False
+    for key, required_value in _flatten_gold_attributes(gold_item):
+        if required_value not in _candidate_attribute_values(product, key):
+            return False
+    candidate_skus = _candidate_sku_values(product)
+    for required_value in _flatten_gold_sku_values(gold_item):
+        if required_value not in candidate_skus:
+            return False
+    return True
+
+
+def _attribute_match_count(product_ids: list[str], gold_items: list[dict[str, Any]], products_by_id: dict[str, dict]) -> int:
+    if not product_ids or not gold_items:
+        return 0
+    matched_gold: set[int] = set()
+    count = 0
+    for product_id in product_ids:
+        product = products_by_id.get(str(product_id))
+        if product is None:
+            continue
+        for index, gold_item in enumerate(gold_items):
+            if index in matched_gold:
+                continue
+            if _matches_gold_item_by_attributes(product, gold_item):
+                matched_gold.add(index)
+                count += 1
+                break
+    return count
+
+
+def _attribute_f1(product_ids: list[str], gold_items: list[dict[str, Any]], products_by_id: dict[str, dict]) -> float:
+    if not product_ids or not gold_items:
+        return 0.0
+    matched = _attribute_match_count(product_ids, gold_items, products_by_id)
+    precision = matched / len(product_ids) if product_ids else 0.0
+    recall = matched / len(gold_items) if gold_items else 0.0
+    if precision + recall == 0:
+        return 0.0
+    return 2 * precision * recall / (precision + recall)
+
+
+def _attribute_set_exact(product_ids: list[str], gold_items: list[dict[str, Any]], products_by_id: dict[str, dict]) -> float:
+    if not product_ids or len(product_ids) != len(gold_items):
+        return 0.0
+    return 1.0 if _attribute_match_count(product_ids, gold_items, products_by_id) == len(gold_items) else 0.0
+
+
 def _tool_validity(events: list[ToolEvent], assistant_texts: list[str]) -> float:
     if not events:
         return 1.0 if any("<response>" in text for text in assistant_texts) else 0.0
@@ -793,52 +904,62 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
     verify_selected_gold = _ratio_overlap(set(viewed_ids) & set(selected_ids), gold_ids)
     verify_gold_f1 = _set_f1(viewed_ids, gold_ids)
     budget_gold_f1 = _set_f1(budget_ids, gold_ids)
-    shop_constraint_correct = same_shop_correct * budget_gold_f1
-    budget_recomputed_correct = (
-        (1.0 if state["budget_attempted"] else 0.0)
-        * (1.0 if selected_budget.get("supported") else 0.0)
-        * budget_gold_f1
-    )
-    budget_attempt_quality = (1.0 if state["budget_attempted"] else 0.0) * budget_gold_f1
-    budget_numeric_alignment = _budget_numeric_alignment(state["budget_calculations"], selected_budget) * budget_gold_f1
-    within_budget_correct = (1.0 if selected_budget.get("within_budget") else 0.0) * budget_gold_f1
+    select_attribute_f1 = _attribute_f1(selected_ids, gold_items, products_by_id)
+    viewed_attribute_f1 = _attribute_f1(sorted(viewed_ids), gold_items, products_by_id)
+    budget_attribute_f1 = _attribute_f1(budget_ids, gold_items, products_by_id)
+    recommend_attribute_f1 = _attribute_f1(recommended_ids, gold_items, products_by_id)
     recommend_gold_overlap = _ratio_overlap(recommended_ids, gold_ids)
     recommend_gold_precision = _set_precision(recommended_ids, gold_ids)
     recommend_gold_f1 = _set_f1(recommended_ids, gold_ids)
+    select_relevance_f1 = max(select_gold_f1, select_attribute_f1)
+    verify_relevance_f1 = max(verify_gold_f1, viewed_attribute_f1)
+    budget_relevance_f1 = max(budget_gold_f1, budget_attribute_f1)
+    recommend_relevance_f1 = max(recommend_gold_f1, recommend_attribute_f1)
+    shop_constraint_correct = same_shop_correct * budget_relevance_f1
+    budget_recomputed_correct = (
+        (1.0 if state["budget_attempted"] else 0.0)
+        * (1.0 if selected_budget.get("supported") else 0.0)
+        * budget_relevance_f1
+    )
+    budget_attempt_quality = (1.0 if state["budget_attempted"] else 0.0) * budget_relevance_f1
+    budget_numeric_alignment = _budget_numeric_alignment(state["budget_calculations"], selected_budget) * budget_relevance_f1
+    within_budget_correct = (1.0 if selected_budget.get("within_budget") else 0.0) * budget_relevance_f1
+    recommend_attribute_exact = _attribute_set_exact(recommended_ids, gold_items, products_by_id)
     recommend_count_match = (
-        recommend_gold_f1 if recommended_ids and len(recommended_ids) == len(gold_ids) else 0.0
+        recommend_relevance_f1 if recommended_ids and len(recommended_ids) == len(gold_ids) else 0.0
     )
     ordered_exact_success = 1.0 if recommended_ids == gold_ids and gold_ids else 0.0
     set_exact_success = (
         1.0 if recommended_ids and len(recommended_ids) == len(gold_ids) and set(recommended_ids) == set(gold_ids) else 0.0
     )
-    terminate_quality = recommend_gold_f1 if state["terminate_success"] and recommended_ids else 0.0
+    semantic_set_exact_success = max(set_exact_success, recommend_attribute_exact)
+    terminate_quality = recommend_relevance_f1 if state["terminate_success"] and recommended_ids else 0.0
 
     progress_components = {
         "search_gold_recall": search_gold_recall,
-        "select_gold_f1": select_gold_f1,
-        "verify_gold_f1": verify_gold_f1,
+        "select_gold_f1": select_relevance_f1,
+        "verify_gold_f1": verify_relevance_f1,
         "shop_constraint_correct": shop_constraint_correct,
         "budget_attempt_quality": budget_attempt_quality,
         "budget_recomputed_correct": budget_recomputed_correct,
         "budget_numeric_alignment": budget_numeric_alignment,
         "within_budget_correct": within_budget_correct,
-        "recommend_gold_f1": recommend_gold_f1,
+        "recommend_gold_f1": recommend_relevance_f1,
         "recommend_count_match": recommend_count_match,
-        "set_exact": set_exact_success,
+        "set_exact": semantic_set_exact_success,
         "terminate_quality": terminate_quality,
     }
     progress = sum(PROGRESS_WEIGHTS[key] * progress_components[key] for key in PROGRESS_WEIGHTS)
 
-    exact_success = set_exact_success
-    budget_success = 1.0 if set_exact_success and recommended_budget.get("within_budget") else 0.0
+    exact_success = semantic_set_exact_success
+    budget_success = 1.0 if semantic_set_exact_success and recommended_budget.get("within_budget") else 0.0
     terminate_after_valid_recommend = 1.0 if state["terminate_success"] and budget_success else 0.0
     final_success = 1.0 if budget_success and state["terminate_success"] else 0.0
-    outcome = 1.5 * final_success + 0.5 * budget_success + 0.25 * set_exact_success
+    outcome = 1.5 * final_success + 0.5 * budget_success + 0.25 * semantic_set_exact_success
 
     steps = max(1, len(assistant_texts))
     step_penalty = _env_float("SHOPPINGBENCH_STEP_PENALTY", 0.005) * steps
-    wrong_recommend_penalty = 0.15 if recommended_ids and recommend_gold_f1 == 0.0 else 0.0
+    wrong_recommend_penalty = 0.15 if recommended_ids and recommend_relevance_f1 == 0.0 else 0.0
     count_penalty = _recommend_count_penalty(len(recommended_ids), len(gold_ids))
     premature_terminate_penalty = 0.10 if state["terminate_success"] and not recommended_ids else 0.0
     invalid_tool_penalty = 0.05 * (1.0 - tool_valid)
@@ -861,6 +982,8 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
         "exact": exact_success,
         "ordered_exact": ordered_exact_success,
         "set_exact": set_exact_success,
+        "semantic_set_exact": semantic_set_exact_success,
+        "attribute_set_exact": recommend_attribute_exact,
         "budget": budget_success,
         "terminate": 1.0 if state["terminate_success"] else 0.0,
         "same_shop": same_shop_correct,
@@ -884,18 +1007,26 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
         "select_gold_overlap": select_gold_overlap,
         "select_gold_precision": select_gold_precision,
         "select_gold_f1": select_gold_f1,
+        "select_attribute_f1": select_attribute_f1,
+        "select_relevance_f1": select_relevance_f1,
         "verify_selected_gold": verify_selected_gold,
         "verify_gold_f1": verify_gold_f1,
+        "verify_attribute_f1": viewed_attribute_f1,
+        "verify_relevance_f1": verify_relevance_f1,
         "shop_constraint_correct": shop_constraint_correct,
         "budget_attempted": 1.0 if state["budget_attempted"] else 0.0,
         "budget_attempt_quality": budget_attempt_quality,
         "budget_gold_f1": budget_gold_f1,
+        "budget_attribute_f1": budget_attribute_f1,
+        "budget_relevance_f1": budget_relevance_f1,
         "budget_recomputed_correct": budget_recomputed_correct,
         "budget_numeric_alignment": budget_numeric_alignment,
         "within_budget_correct": within_budget_correct,
         "recommend_gold_overlap": recommend_gold_overlap,
         "recommend_gold_precision": recommend_gold_precision,
         "recommend_gold_f1": recommend_gold_f1,
+        "recommend_attribute_f1": recommend_attribute_f1,
+        "recommend_relevance_f1": recommend_relevance_f1,
         "recommend_count_match": recommend_count_match,
         "terminate_quality": terminate_quality,
         "terminate_after_valid_recommend": terminate_after_valid_recommend,

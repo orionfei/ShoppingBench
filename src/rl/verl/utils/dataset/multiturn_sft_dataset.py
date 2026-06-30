@@ -18,6 +18,7 @@ Multi-turn SFT dataset that supports training on conversation data with multiple
 
 import json
 import logging
+import os
 from typing import Any, Optional
 
 import numpy as np
@@ -74,6 +75,7 @@ class MultiTurnSFTDataset(Dataset):
         config = config or {}
         self.truncation = config.get("truncation", "error")
         self.max_length = config.get("max_length", 1024)
+        self._token_mismatch_warning_count = 0
         # Get messages_key from the new multiturn config structure
         multiturn_config = config.get("multiturn", {})
         self.messages_key = multiturn_config.get("messages_key", "messages")
@@ -105,6 +107,12 @@ class MultiTurnSFTDataset(Dataset):
                 ls = ls[0]
             return ls
 
+        def messages_to_item(value):
+            value = series_to_item(value)
+            if isinstance(value, str):
+                value = json.loads(value)
+            return convert_nested_value_to_list_recursive(value)
+
         dataframes = []
         for parquet_file in self.parquet_files:
             dataframe = pd.read_parquet(parquet_file)
@@ -112,7 +120,7 @@ class MultiTurnSFTDataset(Dataset):
         self.dataframe = pd.concat(dataframes)
 
         # Extract messages list from dataframe
-        self.messages = self.dataframe[self.messages_key].apply(series_to_item).tolist()
+        self.messages = self.dataframe[self.messages_key].apply(messages_to_item).tolist()
 
         # Extract tools list from dataframe
         if self.tools_key in self.dataframe.columns:
@@ -252,12 +260,17 @@ class MultiTurnSFTDataset(Dataset):
         if len(concat_tokens) != len(full_tokens_list) or not all(
             a == b for a, b in zip(concat_tokens, full_tokens_list, strict=True)
         ):
-            logging.warning(
-                f"Token mismatch detected! Full tokenization length: {len(full_tokens_list)}, Concatenated tokens "
-                f"length: {len(concat_tokens)}. Using concatenated version."
-                # f"full tokens text: {self.tokenizer.decode(full_tokens_list)}"
-                # f"concat tokens text: {self.tokenizer.decode(concat_tokens)}"
-            )
+            if os.getenv("VERL_SFT_WARN_TOKEN_MISMATCH", "0") == "1":
+                if self._token_mismatch_warning_count < 5:
+                    logging.warning(
+                        f"Token mismatch detected! Full tokenization length: {len(full_tokens_list)}, "
+                        f"Concatenated tokens length: {len(concat_tokens)}. Using concatenated version."
+                        # f"full tokens text: {self.tokenizer.decode(full_tokens_list)}"
+                        # f"concat tokens text: {self.tokenizer.decode(concat_tokens)}"
+                    )
+                elif self._token_mismatch_warning_count == 5:
+                    logging.warning("Additional token mismatch warnings are suppressed for this dataset worker.")
+            self._token_mismatch_warning_count += 1
             return (
                 torch.tensor(concat_tokens, dtype=torch.long),
                 torch.tensor(concat_loss_mask, dtype=torch.long),
@@ -277,7 +290,11 @@ class MultiTurnSFTDataset(Dataset):
         enable_thinking = self.enable_thinking[item] if self.enable_thinking is not None else None
 
         if self.tools is not None:
-            tools = json.loads(self.tools[item])
+            tools = self.tools[item]
+            if isinstance(tools, str):
+                tools = json.loads(tools)
+            else:
+                tools = convert_nested_value_to_list_recursive(tools)
         else:
             tools = None
 

@@ -1,8 +1,13 @@
 from collections import Counter
+from pathlib import Path
 
 from sentence_transformers import SentenceTransformer
 
-sentence_model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
+ROOT_DIR = Path(__file__).resolve().parents[3]
+LOCAL_EMBEDDING_MODEL = ROOT_DIR / "model" / "Qwen3-Embedding-0.6B"
+sentence_model = SentenceTransformer(
+    str(LOCAL_EMBEDDING_MODEL) if LOCAL_EMBEDDING_MODEL.exists() else "Qwen/Qwen3-Embedding-0.6B"
+)
 
 
 def ground_truth_reward(product: dict, reward: dict) -> float:

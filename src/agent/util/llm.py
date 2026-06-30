@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import logging
 from urllib.parse import urlparse
@@ -14,6 +15,13 @@ RETRY_DELAY = float(os.getenv("SHOPPINGBENCH_LLM_RETRY_DELAY", "3"))
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger()
+
+
+CONTEXT_LENGTH_RE = re.compile(
+    r"maximum context length is (?P<limit>\d+) tokens.*requested (?P<requested>\d+) tokens "
+    r"\((?P<prompt>\d+) in the messages, (?P<completion>\d+) in the completion\)",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def should_bypass_env_proxy(base_url: str | None, model_config: dict | None = None) -> bool:
@@ -76,6 +84,7 @@ def ask_llm(
     api_key: str = None,
 ) -> tuple[str, str]:
     success = False
+    request_model_config = dict(model_config)
     model = model_config.get("model", "")
     is_mimo_model = isinstance(model, str) and model.startswith("mimo")
     resolved_base_url = base_url if base_url else (
@@ -102,13 +111,13 @@ def ask_llm(
                 timeout=TIMEOUT,
             )
 
-            if model_config.get("stream", False):
+            if request_model_config.get("stream", False):
                 reasoning_content, content = chat_completion_stream(
-                    client, messages, model_config
+                    client, messages, request_model_config
                 )
             else:
                 reasoning_content, content = chat_completion(
-                    client, messages, model_config
+                    client, messages, request_model_config
                 )
 
             if reasoning_content or content:
@@ -117,6 +126,23 @@ def ask_llm(
             else:
                 raise Exception("reasoning_content and content is empty")
         except Exception as e:
+            match = CONTEXT_LENGTH_RE.search(str(e))
+            if match and "max_tokens" in request_model_config:
+                limit = int(match.group("limit"))
+                prompt_tokens = int(match.group("prompt"))
+                current_max_tokens = int(request_model_config.get("max_tokens") or 0)
+                adjusted_max_tokens = max(32, limit - prompt_tokens - 1)
+                if 0 < adjusted_max_tokens < current_max_tokens:
+                    logger.warning(
+                        "Reducing max_tokens from %s to %s for this request because "
+                        "prompt uses %s/%s tokens.",
+                        current_max_tokens,
+                        adjusted_max_tokens,
+                        prompt_tokens,
+                        limit,
+                    )
+                    request_model_config["max_tokens"] = adjusted_max_tokens
+                    continue
             logger.error(f"Error occurred: {e}. Retry {i+1}/{MAX_RETRIES}.")
             time.sleep(RETRY_DELAY)
         finally:

@@ -16,7 +16,7 @@ if str(AGENT_SRC) not in sys.path:
 from util.message import Message, OUTPUT_ROLES  # noqa: E402
 
 
-DEFAULT_TOKENIZER = "Qwen3-Embedding-0.6B"
+DEFAULT_TOKENIZER = "model/Qwen3-4B"
 DEFAULT_MAX_PROMPT_LENGTH = 16384
 DEFAULT_MAX_RESPONSE_LENGTH = 1024
 DEFAULT_MAX_TOTAL_LENGTH = 18000

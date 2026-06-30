@@ -45,6 +45,11 @@ def get_user_prompt(message: Message, history_messages: list[str], config: dict 
         return build_state_folded_user_prompt(
             history_messages,
             max_candidates_per_search=config.get("state_max_candidates_per_search", 10),
+            max_searches=config.get("state_max_searches"),
+            max_budget_candidates=config.get("state_max_budget_candidates"),
+            max_viewed_products=config.get("state_max_viewed_products"),
+            never_expand=config.get("state_never_expand", False),
+            min_char_saving_for_state=config.get("state_min_char_saving", 0.0),
         )
 
     history = "\n\n".join(history_messages)
@@ -86,8 +91,11 @@ def act(message: Message) -> list[dict]:
     return obs
 
 
-def is_terminate(message: Message) -> bool:
-    if (not message.think and not message.tool_call and not message.response) or "terminate" in { commend["name"] for commend in message.tool_call }:
+def is_terminate(message: Message, config: dict | None = None) -> bool:
+    tool_names = {commend["name"] for commend in message.tool_call}
+    if (config or {}).get("stop_after_recommend") and "recommend_product" in tool_names:
+        return True
+    if (not message.think and not message.tool_call and not message.response) or "terminate" in tool_names:
         return True
     return False
 
@@ -131,7 +139,7 @@ def react_loop(query: str, config: dict):
             }
         )
         #print(f"{'*' * 20}Setps: {step}/{MAX_STEPS}{'*' * 20}\nReasoning Content: {reasoning_content}\nContent: {content}\nMessage: {json.dumps(message.to_dict(), indent=4)}\n")
-        if is_terminate(message):
+        if is_terminate(message, config):
             break
 
     with open(config["rollout_file"], "a") as fout:
@@ -202,6 +210,6 @@ if __name__ == "__main__":
     config_file = sys.argv[1]
     with open(config_file, "r") as fin:
         config = json.load(fin)
-    if config["task"] != "knowledge":
+    if config["task"] not in {"knowledge", "web"}:
         config["exclude_tools"] = config.get("exclude_tools", []) + ["web_search"]
     rollout(config)

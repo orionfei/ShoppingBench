@@ -502,17 +502,53 @@ def apply_fsdp2(model, fsdp_kwargs, config):
 
 def fsdp2_clip_grad_norm_(parameters, max_norm, norm_type=2.0, error_if_nonfinite=False, foreach=None):
     """torch.nn.utils.clip_grad_norm_ cann't run on cpu parameter DTensor"""
-    from torch.nn.utils.clip_grad import _clip_grads_with_norm_, _get_total_norm
-
     if isinstance(parameters, torch.Tensor):
         parameters = [parameters]
     else:
         # prevent generators from being exhausted
         parameters = list(parameters)
     grads = [p.grad for p in parameters if p.grad is not None]
-    total_norm = _get_total_norm(grads, norm_type, error_if_nonfinite, foreach)
-    total_norm = total_norm.to(get_device_id(), non_blocking=True)
-    _clip_grads_with_norm_(parameters, max_norm, total_norm, foreach)
+
+    try:
+        from torch.nn.utils.clip_grad import _clip_grads_with_norm_, _get_total_norm
+
+        total_norm = _get_total_norm(grads, norm_type, error_if_nonfinite, foreach)
+        total_norm = total_norm.to(get_device_id(), non_blocking=True)
+        _clip_grads_with_norm_(parameters, max_norm, total_norm, foreach)
+        return total_norm
+    except ImportError:
+        pass
+
+    device = get_device_id()
+    if len(grads) == 0:
+        return torch.tensor(0.0, device=device)
+
+    norm_type = float(norm_type)
+
+    def _local_grad(grad):
+        return grad.to_local() if hasattr(grad, "to_local") else grad
+
+    if norm_type == math.inf:
+        local_norm = torch.stack([_local_grad(g).detach().abs().max().to(device) for g in grads]).max()
+        if dist.is_initialized():
+            dist.all_reduce(local_norm, op=dist.ReduceOp.MAX)
+        total_norm = local_norm
+    else:
+        local_norm = torch.zeros((), device=device)
+        for grad in grads:
+            grad_norm = torch.linalg.vector_norm(_local_grad(grad).detach(), norm_type).to(device)
+            local_norm += grad_norm.pow(norm_type)
+        if dist.is_initialized():
+            dist.all_reduce(local_norm, op=dist.ReduceOp.SUM)
+        total_norm = local_norm.pow(1.0 / norm_type)
+
+    if error_if_nonfinite and torch.logical_or(total_norm.isnan(), total_norm.isinf()):
+        raise RuntimeError(f"The total norm of gradients is non-finite: {total_norm}")
+
+    clip_coef = torch.clamp(torch.as_tensor(max_norm, device=device) / (total_norm + 1e-6), max=1.0)
+    for param in parameters:
+        if param.grad is not None:
+            param.grad.detach().mul_(clip_coef)
     return total_norm
 
 

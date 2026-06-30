@@ -2,7 +2,7 @@
 set -euo pipefail
 
 export PROJECT_NAME="${PROJECT_NAME:-shoppingbench-rl}"
-export EXPERIMENT_NAME="${EXPERIMENT_NAME:-grpo_qwen3-1.7b_query_verl}"
+export EXPERIMENT_NAME="${EXPERIMENT_NAME:-grpo_qwen3-4b_query_verl}"
 export PYTHONUNBUFFERED=1
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 export SHOPPINGBENCH_PRODUCT_CACHE="${SHOPPINGBENCH_PRODUCT_CACHE:-dataset/shoppingbench_query/product_cache.json}"
@@ -16,7 +16,7 @@ case ",$NO_PROXY," in
 esac
 export no_proxy="$NO_PROXY"
 
-MODEL_PATH="${MODEL_PATH:-model/Qwen3-1.7B}"
+MODEL_PATH="${MODEL_PATH:-model/Qwen3-4B}"
 if [[ $# -gt 0 && "$1" != --* && "$1" != *=* ]]; then
   MODEL_PATH="$1"
   shift
@@ -42,10 +42,21 @@ ROLLOUT_GPU_MEMORY_UTILIZATION="${ROLLOUT_GPU_MEMORY_UTILIZATION:-0.38}"
 ROLLOUT_TENSOR_MODEL_PARALLEL_SIZE="${ROLLOUT_TENSOR_MODEL_PARALLEL_SIZE:-1}"
 ROLLOUT_MODE="${ROLLOUT_MODE:-async}"
 ROLLOUT_NAME="${ROLLOUT_NAME:-vllm}"
+if [[ "$ROLLOUT_NAME" == "vllm" && "$ROLLOUT_MODE" == "async" && "$VLLM_USE_V1" != "1" ]]; then
+  echo "Forcing VLLM_USE_V1=1 because async vLLM rollout uses vLLM V1 AsyncLLM." >&2
+  export VLLM_USE_V1=1
+fi
 ROLLOUT_AGENT_NUM_WORKERS="${ROLLOUT_AGENT_NUM_WORKERS:-8}"
 MAX_ASSISTANT_TURNS="${MAX_ASSISTANT_TURNS:-null}"
 MAX_USER_TURNS="${MAX_USER_TURNS:-null}"
+MAX_PARALLEL_CALLS="${MAX_PARALLEL_CALLS:-4}"
 MAX_TOOL_RESPONSE_LENGTH="${MAX_TOOL_RESPONSE_LENGTH:-256}"
+STATE_MAX_CANDIDATES_PER_SEARCH="${STATE_MAX_CANDIDATES_PER_SEARCH:-10}"
+STATE_MAX_SEARCHES="${STATE_MAX_SEARCHES:-12}"
+STATE_MAX_BUDGET_CANDIDATES="${STATE_MAX_BUDGET_CANDIDATES:-120}"
+STATE_MAX_VIEWED_PRODUCTS="${STATE_MAX_VIEWED_PRODUCTS:-40}"
+STATE_NEVER_EXPAND="${STATE_NEVER_EXPAND:-False}"
+STATE_MIN_CHAR_SAVING="${STATE_MIN_CHAR_SAVING:-0.0}"
 TOKENIZATION_SANITY_CHECK_MODE="${TOKENIZATION_SANITY_CHECK_MODE:-ignore_strippable}"
 ATTN_IMPLEMENTATION="${ATTN_IMPLEMENTATION:-sdpa}"
 USE_REMOVE_PADDING="${USE_REMOVE_PADDING:-False}"
@@ -80,7 +91,15 @@ export SHOPPINGBENCH_PROTOCOL_ANNEAL_STEPS="${SHOPPINGBENCH_PROTOCOL_ANNEAL_STEP
 export SHOPPINGBENCH_PROTOCOL_ANNEAL_FRACTION="${SHOPPINGBENCH_PROTOCOL_ANNEAL_FRACTION:-0.0}"
 export SHOPPINGBENCH_STEP_PENALTY="${SHOPPINGBENCH_STEP_PENALTY:-0.0}"
 
-python3 -m verl.trainer.main_ppo \
+if [[ -z "${PYTHON_BIN:-}" ]]; then
+  if [[ -x /root/miniconda3/envs/shoppingbench-verl/bin/python ]]; then
+    PYTHON_BIN="/root/miniconda3/envs/shoppingbench-verl/bin/python"
+  else
+    PYTHON_BIN="python3"
+  fi
+fi
+
+"$PYTHON_BIN" -m verl.trainer.main_ppo \
   algorithm.adv_estimator=grpo \
   data.train_files="$TRAIN_FILES" \
   data.val_files="$VAL_FILES" \
@@ -133,7 +152,14 @@ python3 -m verl.trainer.main_ppo \
   actor_rollout_ref.rollout.multi_turn.tool_config_path=config/rl/shoppingbench_tools.yaml \
   actor_rollout_ref.rollout.multi_turn.max_assistant_turns="$MAX_ASSISTANT_TURNS" \
   actor_rollout_ref.rollout.multi_turn.max_user_turns="$MAX_USER_TURNS" \
+  actor_rollout_ref.rollout.multi_turn.max_parallel_calls="$MAX_PARALLEL_CALLS" \
   actor_rollout_ref.rollout.multi_turn.max_tool_response_length="$MAX_TOOL_RESPONSE_LENGTH" \
+  actor_rollout_ref.rollout.multi_turn.state_max_candidates_per_search="$STATE_MAX_CANDIDATES_PER_SEARCH" \
+  actor_rollout_ref.rollout.multi_turn.state_max_searches="$STATE_MAX_SEARCHES" \
+  actor_rollout_ref.rollout.multi_turn.state_max_budget_candidates="$STATE_MAX_BUDGET_CANDIDATES" \
+  actor_rollout_ref.rollout.multi_turn.state_max_viewed_products="$STATE_MAX_VIEWED_PRODUCTS" \
+  actor_rollout_ref.rollout.multi_turn.state_never_expand="$STATE_NEVER_EXPAND" \
+  actor_rollout_ref.rollout.multi_turn.state_min_char_saving="$STATE_MIN_CHAR_SAVING" \
   actor_rollout_ref.rollout.multi_turn.tokenization_sanity_check_mode="$TOKENIZATION_SANITY_CHECK_MODE" \
   actor_rollout_ref.rollout.agent.num_workers="$ROLLOUT_AGENT_NUM_WORKERS" \
   actor_rollout_ref.rollout.val_kwargs.n="$ROLLOUT_N" \

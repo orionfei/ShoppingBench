@@ -387,7 +387,7 @@ def prepare_sft(args, tokenizer) -> dict:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Prepare ShoppingBench parquet data for verl SFT and GRPO.")
-    parser.add_argument("--model-name", default="model/Qwen3-1.7B")
+    parser.add_argument("--model-name", default="model/Qwen3-4B")
     parser.add_argument("--seed", type=int, default=20260617)
     parser.add_argument("--skip-sft", action="store_true")
     parser.add_argument("--skip-query", action="store_true")

@@ -4,7 +4,7 @@ task_submit_setting:
   project: '${project}'
 llm_running_param:
   basic:
-    model_name_or_path: Qwen/Qwen3-4B
+    model_name_or_path: /root/project/ShoppingBench/model/Qwen3-4B
     adapter_name_or_path: ''
     lora_target: 'o_proj,q_proj,k_proj,v_proj'
     template: 'qwen3'

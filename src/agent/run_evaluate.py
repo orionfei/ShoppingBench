@@ -1,4 +1,5 @@
 import sys
+import os
 import ujson as json
 from collections import defaultdict
 
@@ -11,7 +12,7 @@ from util.message import Message, OUTPUT_ROLES
 
 FIELDS = ["title", "price", "service", "sku & attrs"]
 
-searcher = LuceneSearcher("indexes")
+searcher = LuceneSearcher(os.getenv("INDEX_DIR", "indexes"))
 
 
 def load_rollout_outputs(config: dict) -> dict:

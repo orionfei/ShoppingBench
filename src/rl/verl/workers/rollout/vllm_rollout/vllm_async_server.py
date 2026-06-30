@@ -14,6 +14,9 @@
 import logging
 import os
 import pickle
+import signal
+import threading
+from contextlib import contextmanager
 from typing import Any, Callable, Optional
 
 import ray
@@ -37,6 +40,37 @@ from verl.utils.fs import copy_to_local
 from verl.workers.rollout.async_server import AsyncServerBase
 
 logger = logging.getLogger(__file__)
+
+
+def _ensure_cuda_visible_for_vllm_platform_probe():
+    if os.environ.get("CUDA_VISIBLE_DEVICES") != "":
+        return
+
+    # The async server actor delegates model execution to external rollout
+    # workers, but vLLM V1 still probes the CUDA platform while building the
+    # engine config. Ray CPU actors expose an empty CUDA_VISIBLE_DEVICES, which
+    # makes that probe fail before the external executor is installed.
+    os.environ["CUDA_VISIBLE_DEVICES"] = os.environ.get("VERL_VLLM_SERVER_CUDA_VISIBLE_DEVICES", "0")
+
+
+@contextmanager
+def _skip_sigusr1_registration_off_main_thread():
+    if threading.current_thread() is threading.main_thread():
+        yield
+        return
+
+    original_signal = signal.signal
+
+    def signal_wrapper(signum, handler):
+        if signum == signal.SIGUSR1:
+            return signal.getsignal(signum)
+        return original_signal(signum, handler)
+
+    signal.signal = signal_wrapper
+    try:
+        yield
+    finally:
+        signal.signal = original_signal
 
 
 def _get_model_runner_workers(vllm_config, init_ray: bool = True):
@@ -263,8 +297,13 @@ class AsyncvLLMServer(AsyncServerBase):
         )
 
         # init async llm engine
+        _ensure_cuda_visible_for_vllm_platform_probe()
         vllm_config = self._create_engine_config(engine_args)
-        self.engine = AsyncLLM.from_vllm_config(vllm_config)
+        with _skip_sigusr1_registration_off_main_thread():
+            if hasattr(AsyncLLM, "from_vllm_config"):
+                self.engine = AsyncLLM.from_vllm_config(vllm_config)
+            else:
+                self.engine = AsyncLLM.from_engine_args(engine_args, engine_config=vllm_config)
 
         # build serving chat
         model_config = self.engine.model_config

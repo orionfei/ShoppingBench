@@ -14,6 +14,8 @@ AGENT_SRC = ROOT_DIR / "src" / "agent"
 if str(AGENT_SRC) not in sys.path:
     sys.path.insert(0, str(AGENT_SRC))
 
+from util.history_compression import normalize_state_schema  # noqa: E402
+
 OUTPUT_ROLES = ["think", "tool_call", "response"]
 
 
@@ -348,24 +350,6 @@ def build_state(
             slots[idx]["status"] = "candidate_selected"
             slots[idx]["product"] = product
 
-    pending = []
-    if len(ordered_selected) < len(reward):
-        if voucher.get("voucher_type") == "shop" and selected_shops:
-            pending.append("find_remaining_products_inside_shop_anchor")
-        else:
-            pending.append("find_remaining_products")
-    elif selected_ids and any(pid not in verified_details for pid in selected_ids):
-        pending.append("verify_product_information")
-        pending.append("check_voucher_budget")
-    elif not calculations:
-        pending.append("check_voucher_budget")
-    else:
-        last_calc = calculations[-1]
-        if isinstance(last_calc, dict) and last_calc.get("within_budget") is True:
-            pending.append("recommend_products_and_terminate")
-        else:
-            pending.append("revise_selection_or_fail")
-
     state = {
         "task_type": "voucher_budget",
         "voucher": voucher_state(voucher),
@@ -388,9 +372,8 @@ def build_state(
         "latest_budget_calculation": calculations[-1] if calculations else None,
         "observed_counts": dict(observed_counts),
         "previous_tools": previous_tools,
-        "pending": pending,
     }
-    return state
+    return normalize_state_schema(state)
 
 
 def folded_prompt(query: str, state: dict | None) -> str:

@@ -1,5 +1,5 @@
 ### model
-model_name_or_path: /home/wangjiangyuan.wjy/model/Qwen/Qwen3-4B
+model_name_or_path: /root/project/ShoppingBench/model/Qwen3-4B
 template: qwen3
 trust_remote_code: true
 
