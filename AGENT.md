@@ -9,8 +9,7 @@ decision variance for GRPO to learn from group differences.
 ## 1. Unified verl Pipeline
 
 SFT and RL are intended to run through the verl stack, instead of training SFT in
-a separate LLaMA-Factory-style path and then switching to a different RL
-framework.
+a separate external SFT path and then switching to a different RL framework.
 
 The unified data preparation entry is:
 

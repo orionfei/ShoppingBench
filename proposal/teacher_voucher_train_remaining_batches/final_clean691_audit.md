@@ -6,8 +6,7 @@ Status: PASSED
 
 - Rollout: `data/teacher_voucher_train_clean691_state_folded.jsonl`
 - Synthesize: `data/teacher_voucher_train_clean691_synthesize.jsonl`
-- SFT: `data/teacher_voucher_train_clean691_sft.json`
-- SFT report: `data/teacher_voucher_train_clean691_sft_report.json`
+- verl SFT dataset: `dataset/shoppingbench_sft_state_folded`
 - Deep audit JSON: `data/teacher_voucher_train_clean691_deep_audit.json`
 
 ## Counts
@@ -16,7 +15,7 @@ Status: PASSED
 - Clean trajectories included: 691
 - Hard clean: 227
 - Non-hard clean: 464
-- SFT examples: 2159
+- Assistant steps: 2159
 - Total assistant steps: 2159
 - Step histogram: {'3': 605, '4': 86}
 - Excluded rows: 59
@@ -25,7 +24,7 @@ Status: PASSED
 
 - Deep audit problem count: 0
 - Format/schema/source alignment/recommend ids/budget checks: passed
-- `tool_call_id` is not visible in `completion.content` or SFT outputs
+- `tool_call_id` is not visible in `completion.content`
 - Unique `<think>` strings: 2159
 - Empty `<think>` strings: 0
 - SFT dependency check: True

@@ -3,8 +3,7 @@
   "final_files": {
     "rollout": "data/teacher_voucher_train_clean691_state_folded.jsonl",
     "synthesize": "data/teacher_voucher_train_clean691_synthesize.jsonl",
-    "sft": "data/teacher_voucher_train_clean691_sft.json",
-    "sft_report": "data/teacher_voucher_train_clean691_sft_report.json",
+    "verl_sft_dataset": "dataset/shoppingbench_sft_state_folded",
     "deep_audit": "data/teacher_voucher_train_clean691_deep_audit.json"
   },
   "counts": {
@@ -13,7 +12,7 @@
     "hard_clean": 227,
     "nonhard_clean": 464,
     "excluded_rows": 59,
-    "sft_examples": 2159,
+    "assistant_steps": 2159,
     "steps_total": 2159,
     "steps_hist": {
       "3": 605,
@@ -36,7 +35,7 @@
     ],
     "unique_thinks": 2159,
     "empty_thinks": 0,
-    "tool_call_id_visible_in_content_or_sft": false
+    "tool_call_id_visible_in_content": false
   },
   "qwen3_4b_tokenizer": {
     "prompt_tokens": {

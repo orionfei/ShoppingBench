@@ -31,7 +31,6 @@ model
 # Local environment and credentials
 .env
 .env.*
-!src/sft/LLaMA-Factory/.env.local
 .venv/
 .jdk/
 *.pem
@@ -65,11 +64,9 @@ data/*
 !data/synthesize_voucher_test.jsonl
 !data/teacher_voucher_train_clean691_state_folded.jsonl
 !data/teacher_voucher_train_clean691_synthesize.jsonl
-!data/teacher_voucher_train_clean691_sft.json
 !data/teacher_voucher_train_clean691_report.json
 !data/teacher_voucher_train_clean691_final_audit.json
 !data/teacher_voucher_train_clean691_deep_audit.json
-!data/teacher_voucher_train_clean691_sft_report.json
 !data/rl_voucher_clean300_synthesize.jsonl
 !data/rl_voucher_queries_750_report.json
 !data/rl_voucher_queries_750.jsonl

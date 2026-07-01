@@ -8,8 +8,8 @@ export OMP_NUM_THREADS="${OMP_NUM_THREADS_OVERRIDE:-8}"
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 
 MODEL_PATH="${MODEL_PATH:-model/Qwen3-4B}"
-TRAIN_FILES="${TRAIN_FILES:-dataset/shoppingbench_sft_state_folded_single_action_viewshortlist_top3max10_schemav3/train.parquet}"
-VAL_FILES="${VAL_FILES:-dataset/shoppingbench_sft_state_folded_single_action_viewshortlist_top3max10_schemav3/test.parquet}"
+TRAIN_FILES="${TRAIN_FILES:-dataset/shoppingbench_sft_state_folded_hybrid_action_schemav3/train.parquet}"
+VAL_FILES="${VAL_FILES:-dataset/shoppingbench_sft_state_folded_hybrid_action_schemav3/test.parquet}"
 
 PROJECT_NAME="${PROJECT_NAME:-shoppingbench-sft}"
 EXPERIMENT_NAME="${EXPERIMENT_NAME:-qwen3-4b_state_folded_verl}"

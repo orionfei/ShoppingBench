@@ -88,48 +88,35 @@ To run model inference on test data and evaluate the models for different intent
    
 ## Training SFT and RL Models
 
-### SFT Environment Installation
+### verl Environment Installation
 
-Install SFT environment and its dependencies (llama factory):
-
-```bash
-cd src/sft/LLaMA-Factory
-uv pip install -e ".[torch,metrics,deepspeed]" --no-build-isolation
-```
-
-### RL Environment Installation
-
-Install RL environment and its dependencies:
+Install the unified verl environment used for both SFT and RL:
 
 ```bash
 cd src/rl
 USE_MEGATRON=0 bash install_vllm_sglang_mcore.sh
-# verl
 uv pip install -e .
 ```
 
 ### Usage
 To train the SFT and RL models:
 
-For SFT training:  
-1. prepare sft data
-   ```bash
-   cd src/sft
-   mkdir data
-   ```
-   place dataset_info.json and training data in the data directory
-
-2.  run sft scripts
+For SFT data preparation:
 ```bash
-   ./submit.sh yaml_file
-   ```
+python scripts/prepare_verl_shoppingbench_data.py --skip-query
+```
 
-For RL training:  
-1. run rl scripts
-   ```bash
-   cd src/rl
-   ./run_grpo.sh
-   ```
+For SFT training:
+```bash
+TRAIN_FILES=dataset/shoppingbench_sft_state_folded/train.parquet \
+VAL_FILES=dataset/shoppingbench_sft_state_folded/test.parquet \
+./src/rl/run_sft_qwen3_4b_verl_a800.sh
+```
+
+For RL training:
+```bash
+./src/rl/run_grpo.sh
+```
 
 
 ## Paper

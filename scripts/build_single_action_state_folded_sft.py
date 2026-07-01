@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Rebuild voucher SFT data with one tool action per assistant turn.
+"""Rebuild voucher SFT data with hybrid or single-action assistant turns.
 
 This consumes the existing state-folded teacher trajectories. It does not call
-an LLM teacher again; it only splits already verified tool calls and their
+an LLM teacher again; it only reshapes already verified tool calls and their
 stored observations, then rebuilds the online state-folded prompt after each
-single tool result.
+synthetic tool result.
 """
 
 import argparse
@@ -104,11 +104,26 @@ class Message:
 
 
 def read_jsonl(path: Path) -> list:
+    decoder = json.JSONDecoder()
+    buffer = ""
     rows = []
     with path.open(encoding="utf-8") as fin:
         for line in fin:
-            if line.strip():
-                rows.append(json.loads(line))
+            if not line.strip() and not buffer:
+                continue
+            buffer += line
+            while buffer:
+                try:
+                    row, index = decoder.raw_decode(buffer)
+                except json.JSONDecodeError:
+                    break
+                rows.append(row)
+                buffer = buffer[index:].strip()
+    if buffer.strip():
+        row, index = decoder.raw_decode(buffer)
+        rows.append(row)
+        if buffer[index:].strip():
+            raise ValueError(f"Trailing non-JSON content in {path}")
     return rows
 
 
@@ -319,6 +334,67 @@ def single_action_think(original_think: str, call: dict, call_index: int, call_c
     return original_think or f"Execute the next required tool action ({call_index + 1}/{call_count})."
 
 
+def action_groups(calls: list[dict], split_mode: str) -> list[tuple[list[int], list[dict]]]:
+    if split_mode == "single_action":
+        return [([index], [call]) for index, call in enumerate(calls)]
+    if split_mode != "hybrid":
+        raise ValueError(f"Unsupported split mode: {split_mode}")
+
+    groups = []
+    index = 0
+    while index < len(calls):
+        call = calls[index]
+        if call.get("name") != "find_product":
+            groups.append(([index], [call]))
+            index += 1
+            continue
+        indices = []
+        grouped_calls = []
+        while index < len(calls) and calls[index].get("name") == "find_product":
+            indices.append(index)
+            grouped_calls.append(calls[index])
+            index += 1
+        groups.append((indices, grouped_calls))
+    return groups
+
+
+def group_think(original_think: str, calls: list[dict], call_indices: list[int], original_call_count: int) -> str:
+    if len(calls) == 1:
+        return single_action_think(original_think, calls[0], call_indices[0], original_call_count)
+    names = {call.get("name") for call in calls}
+    if names == {"find_product"}:
+        if original_think:
+            return original_think
+        planned = []
+        for call in calls:
+            params = call.get("parameters", {}) or {}
+            planned.append(f"(q={str(params.get('q') or '')!r}, page={params.get('page')})")
+        return "Search the requested product requirements in parallel and retain candidate ids, shops, and prices; planned searches: " + ", ".join(planned) + "."
+    return original_think or f"Execute {len(calls)} related tool actions in this assistant turn."
+
+
+def group_label(sequence: tuple[str, ...]) -> str:
+    if sequence and all(name == "find_product" for name in sequence):
+        return "find_product_batch"
+    return "+".join(sequence) if sequence else "NO_TOOL"
+
+
+def update_transition_stats(sequences: list[tuple[str, ...]], stats: Counter) -> None:
+    labels = [group_label(sequence) for sequence in sequences]
+    for label in labels:
+        stats[f"turn_label::{label}"] += 1
+    for previous, current in zip(labels, labels[1:]):
+        stats[f"transition::{previous}->{current}"] += 1
+
+
+def prefixed_counts(stats: Counter, prefix: str) -> dict[str, int]:
+    return {
+        key[len(prefix):]: value
+        for key, value in sorted(stats.items())
+        if key.startswith(prefix)
+    }
+
+
 def obs_by_tool_call_id(step: dict) -> dict:
     obs = step.get("completion", {}).get("message", {}).get("obs", []) or []
     return {
@@ -392,6 +468,8 @@ def split_teacher_trajectory(
     history_messages: list[str] = []
     message = Message(user=query)
     split_steps = []
+    trajectory_sequences = []
+    split_mode = config.get("split_mode", "hybrid")
 
     for original_step_index, step in enumerate(trajectory):
         completion = step.get("completion", {})
@@ -403,34 +481,48 @@ def split_teacher_trajectory(
         original_think = msg.get("think") or completion.get("reasoning_content") or ""
         observations = obs_by_tool_call_id(step)
         stats[f"original_call_count::{len(calls)}"] += 1
+        groups = action_groups(calls, split_mode)
+        stats[f"original_group_count::{len(groups)}"] += 1
 
-        for call_index, call in enumerate(calls):
+        for call_indices, group_calls in groups:
             user_prompt = get_user_prompt(message, history_messages, config)
             message.clear()
 
-            call_id = call.get("tool_call_id")
-            obs = copy.deepcopy(observations.get(call_id))
-            if obs is None:
-                stats["missing_observation"] += 1
-                obs = {"tool_call_id": call_id, "results": None}
+            normalized_group_calls = []
+            group_obs = []
+            for call in group_calls:
+                call_id = call.get("tool_call_id")
+                obs = copy.deepcopy(observations.get(call_id))
+                if obs is None:
+                    stats["missing_observation"] += 1
+                    obs = {"tool_call_id": call_id, "results": None}
 
-            call, obs = maybe_augment_view_call(call, obs, user_prompt, config, view_cache, stats)
+                call, obs = maybe_augment_view_call(call, obs, user_prompt, config, view_cache, stats)
+                normalized_group_calls.append(call)
+                group_obs.append(obs)
 
-            think = single_action_think(original_think, call, call_index, len(calls))
-            content = output_content(think, [call])
-            one_call_message = {
+            sequence = tuple(call.get("name") for call in normalized_group_calls)
+            trajectory_sequences.append(sequence)
+            think = group_think(original_think, normalized_group_calls, call_indices, len(calls))
+            content = output_content(think, normalized_group_calls)
+            group_message = {
                 "think": think,
-                "tool_call": [copy.deepcopy(call)],
-                "obs": [obs],
+                "tool_call": copy.deepcopy(normalized_group_calls),
+                "obs": group_obs,
             }
 
             extra_info = dict(step.get("extra_info") or {})
             extra_info.update(
                 {
                     "original_step": extra_info.get("step", original_step_index + 1),
-                    "original_call_index": call_index,
+                    "original_call_index": call_indices[0],
+                    "original_call_indices": call_indices,
                     "original_call_count": len(calls),
-                    "single_action_sft": True,
+                    "single_action_sft": split_mode == "single_action",
+                    "hybrid_action_sft": split_mode == "hybrid",
+                    "split_mode": split_mode,
+                    "group_call_count": len(normalized_group_calls),
+                    "group_tool_names": list(sequence),
                     "step": len(split_steps) + 1,
                 }
             )
@@ -443,15 +535,16 @@ def split_teacher_trajectory(
                     "completion": {
                         "reasoning_content": think,
                         "content": content,
-                        "message": one_call_message,
+                        "message": group_message,
                     },
                     "extra_info": extra_info,
                 }
             )
 
-            message = Message.from_dict(one_call_message)
-            stats[f"single_tool::{call.get('name')}"] += 1
+            message = Message.from_dict(group_message)
+            stats[f"tool_sequence::{sequence}"] += 1
 
+    update_transition_stats(trajectory_sequences, stats)
     return split_steps, stats
 
 
@@ -555,6 +648,7 @@ def build_dataset(args) -> dict:
     system_prompt = build_system_prompt(ROOT / args.prompt_file)
     train_tool_weights = parse_tool_weights(args.train_tool_weights)
     config = {
+        "split_mode": args.split_mode,
         "history_compression": "state_folded",
         "state_max_candidates_per_search": args.state_max_candidates_per_search,
         "state_max_searches": args.state_max_searches,
@@ -596,11 +690,14 @@ def build_dataset(args) -> dict:
         "source": args.input,
         "output_jsonl": args.output_jsonl,
         "output_dir": args.output_dir,
+        "split_mode": args.split_mode,
         "trajectories": len(split_rows),
         "view_shortlist_top_k_per_search": args.view_shortlist_top_k_per_search,
         "view_shortlist_max_ids": args.view_shortlist_max_ids,
         "train_tool_weights": train_tool_weights,
         "split_stats": dict(split_stats),
+        "transition_counts": prefixed_counts(split_stats, "transition::"),
+        "turn_label_counts": prefixed_counts(split_stats, "turn_label::"),
         "splits": {},
     }
 
@@ -609,6 +706,7 @@ def build_dataset(args) -> dict:
         stats = Counter()
         tool_counts = Counter()
         for trajectory_idx, trajectory in enumerate(trajectories):
+            trajectory_sequences = []
             for step_idx, step in enumerate(trajectory):
                 item = step_to_parquet_row(
                     step,
@@ -623,6 +721,8 @@ def build_dataset(args) -> dict:
                     continue
                 item["extra_info"]["trajectory_index"] = trajectory_idx
                 item["extra_info"]["trajectory_step_index"] = step_idx
+                sequence = tool_sequence_from_content(item["messages"][-1]["content"])
+                trajectory_sequences.append(sequence)
                 expanded_items = (
                     maybe_duplicate_train_row(item, train_tool_weights, stats)
                     if split == "train"
@@ -632,6 +732,7 @@ def build_dataset(args) -> dict:
                     expanded_item["extra_info"]["index"] = len(rows)
                     tool_counts[tool_sequence_from_content(expanded_item["messages"][-1]["content"])] += 1
                     rows.append(expanded_item)
+            update_transition_stats(trajectory_sequences, stats)
         pd.DataFrame(rows).to_parquet(output_dir / f"{split}.parquet")
         token_lengths = [row["token_length"] for row in rows]
         report["splits"][split] = {
@@ -639,6 +740,8 @@ def build_dataset(args) -> dict:
             "rows": len(rows),
             "stats": dict(stats),
             "tool_sequences": {str(k): v for k, v in tool_counts.items()},
+            "transition_counts": prefixed_counts(stats, "transition::"),
+            "turn_label_counts": prefixed_counts(stats, "turn_label::"),
             "max_tokens": max(token_lengths, default=0),
             "mean_tokens": sum(token_lengths) / len(token_lengths) if token_lengths else 0,
         }
@@ -651,11 +754,17 @@ def build_dataset(args) -> dict:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build single-action state-folded voucher SFT data.")
+    parser = argparse.ArgumentParser(description="Build hybrid-action or single-action state-folded voucher SFT data.")
     parser.add_argument("--input", default="data/teacher_voucher_train_clean691_state_folded.jsonl")
-    parser.add_argument("--output-jsonl", default="data/teacher_voucher_train_clean691_state_folded_single_action.jsonl")
-    parser.add_argument("--output-dir", default="dataset/shoppingbench_sft_state_folded_single_action_schemav3")
-    parser.add_argument("--report", default="reports/sft_single_action_schemav3_data_20260629.json")
+    parser.add_argument("--output-jsonl", default="data/teacher_voucher_train_clean691_state_folded_hybrid_action.jsonl")
+    parser.add_argument("--output-dir", default="dataset/shoppingbench_sft_state_folded_hybrid_action_schemav3")
+    parser.add_argument("--report", default="reports/sft_hybrid_action_schemav3_data_20260701.json")
+    parser.add_argument(
+        "--split-mode",
+        choices=["hybrid", "single_action"],
+        default="hybrid",
+        help="hybrid batches consecutive find_product calls from the same original assistant turn; single_action splits every tool call.",
+    )
     parser.add_argument("--prompt-file", default="src/agent/prompt/rollout.md")
     parser.add_argument("--model-name", default="model/Qwen3-4B")
     parser.add_argument("--seed", type=int, default=20260617)
