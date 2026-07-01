@@ -35,6 +35,7 @@ if str(AGENT_SRC) not in sys.path:
 
 from util.history_compression import build_state_folded_user_prompt  # noqa: E402
 from util.message import ASSISTANT_ROLES, USER_ROLES, Message, generate_tool_call_id  # noqa: E402
+from util.system_prompt import build_system_prompt  # noqa: E402
 
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
@@ -173,6 +174,11 @@ class ToolAgentLoop(AgentLoopBase):
         cls.state_min_char_saving = config.actor_rollout_ref.rollout.multi_turn.get(
             "state_min_char_saving", 0.0
         )
+        system_prompt_file = config.actor_rollout_ref.rollout.multi_turn.get("system_prompt_file", None)
+        if system_prompt_file in (None, "", "null", "None"):
+            cls.runtime_system_prompt = None
+        else:
+            cls.runtime_system_prompt = build_system_prompt(str(system_prompt_file), exclude_tools={"web_search"})
 
     @rollout_trace_op
     async def run(self, messages: list[dict[str, Any]], sampling_params: dict[str, Any]) -> AgentLoopOutput:
@@ -299,6 +305,9 @@ class ToolAgentLoop(AgentLoopBase):
 
     @staticmethod
     def _system_message(messages: list[dict[str, Any]]) -> dict[str, str]:
+        runtime_system_prompt = getattr(ToolAgentLoop, "runtime_system_prompt", None)
+        if runtime_system_prompt:
+            return {"role": "system", "content": runtime_system_prompt}
         for message in messages:
             if message.get("role") == "system":
                 return {"role": "system", "content": str(message.get("content") or "")}

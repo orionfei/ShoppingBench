@@ -57,6 +57,7 @@ STATE_MAX_BUDGET_CANDIDATES="${STATE_MAX_BUDGET_CANDIDATES:-120}"
 STATE_MAX_VIEWED_PRODUCTS="${STATE_MAX_VIEWED_PRODUCTS:-40}"
 STATE_NEVER_EXPAND="${STATE_NEVER_EXPAND:-False}"
 STATE_MIN_CHAR_SAVING="${STATE_MIN_CHAR_SAVING:-0.0}"
+SYSTEM_PROMPT_FILE="${SYSTEM_PROMPT_FILE:-src/agent/prompt/rollout.md}"
 TOKENIZATION_SANITY_CHECK_MODE="${TOKENIZATION_SANITY_CHECK_MODE:-ignore_strippable}"
 ATTN_IMPLEMENTATION="${ATTN_IMPLEMENTATION:-sdpa}"
 USE_REMOVE_PADDING="${USE_REMOVE_PADDING:-False}"
@@ -160,6 +161,7 @@ fi
   actor_rollout_ref.rollout.multi_turn.state_max_viewed_products="$STATE_MAX_VIEWED_PRODUCTS" \
   actor_rollout_ref.rollout.multi_turn.state_never_expand="$STATE_NEVER_EXPAND" \
   actor_rollout_ref.rollout.multi_turn.state_min_char_saving="$STATE_MIN_CHAR_SAVING" \
+  +actor_rollout_ref.rollout.multi_turn.system_prompt_file="$SYSTEM_PROMPT_FILE" \
   actor_rollout_ref.rollout.multi_turn.tokenization_sanity_check_mode="$TOKENIZATION_SANITY_CHECK_MODE" \
   actor_rollout_ref.rollout.agent.num_workers="$ROLLOUT_AGENT_NUM_WORKERS" \
   actor_rollout_ref.rollout.val_kwargs.n="$ROLLOUT_N" \

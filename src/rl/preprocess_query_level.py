@@ -15,7 +15,10 @@ AGENT_SRC = ROOT / "src" / "agent"
 if str(AGENT_SRC) not in sys.path:
     sys.path.insert(0, str(AGENT_SRC))
 
-from toolkit import tools  # noqa: E402
+from util.system_prompt import (  # noqa: E402
+    build_system_prompt as shared_build_system_prompt,
+    tool_schema_text as shared_tool_schema_text,
+)
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -35,17 +38,11 @@ def write_json(path: Path, payload: dict) -> None:
 
 
 def tool_schema_text() -> str:
-    lines = []
-    enabled_tools = [tool for tool in tools if tool.name != "web_search"]
-    for idx, tool in enumerate(enabled_tools, 1):
-        lines.append(f"{idx}. {tool.to_string()}")
-        lines.append("")
-    return "\n".join(lines).strip()
+    return shared_tool_schema_text(exclude_tools={"web_search"})
 
 
 def build_system_prompt(prompt_file: Path) -> str:
-    prompt = prompt_file.read_text(encoding="utf-8").strip()
-    return prompt.replace("<|toolkit_description|>", tool_schema_text())
+    return shared_build_system_prompt(prompt_file, exclude_tools={"web_search"})
 
 
 def load_needed_products(documents_file: Path, product_ids: set[str]) -> dict[str, dict]:
@@ -191,6 +188,8 @@ def main() -> None:
     pd.DataFrame(test).to_parquet(local_dir / "test.parquet")
     report = {
         "source": args.query_file,
+        "prompt_file": args.prompt_file,
+        "system_prompt_chars": len(system_prompt),
         "rows": len(rows),
         "kept": len(converted),
         "train": len(train),

@@ -1,7 +1,7 @@
 from .base import BaseTool
 
 
-DESC = """"Recommend the products to the user. You can use the tool only once."""
+DESC = """Recommend the products to the user. You can use the tool only once."""
 
 PRODUCT_IDS_DESC = """A comma-separated list of product_ids:
 1. If the user finds a single product, provide the product_id that best matches the user's requirements.

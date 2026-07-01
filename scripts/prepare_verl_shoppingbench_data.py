@@ -2,6 +2,7 @@
 import argparse
 import gzip
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -12,6 +13,14 @@ from transformers import AutoTokenizer
 
 
 ROOT = Path(__file__).resolve().parents[1]
+AGENT_SRC = ROOT / "src" / "agent"
+if str(AGENT_SRC) not in sys.path:
+    sys.path.insert(0, str(AGENT_SRC))
+
+from util.system_prompt import (  # noqa: E402
+    build_system_prompt as shared_build_system_prompt,
+    tool_schema_text as shared_tool_schema_text,
+)
 
 
 def read_jsonl(path: Path) -> list:
@@ -38,52 +47,11 @@ def maybe_rel(path: Path) -> str:
 
 
 def tool_schema_text() -> str:
-    tools = [
-        {
-            "name": "find_product",
-            "description": "Search for products and return up to 10 products, with each product including product_id, shop_id, title, price, service, and sold_count.",
-            "parameters": {
-                "q": "string, required. Search query.",
-                "page": "integer, required. Page number from 1 to 5.",
-                "shop_id": "string, optional. Restrict search to one shop.",
-                "price": "string, optional. Price range such as 0-100.",
-                "sort": "string, optional. One of priceasc, pricedesc, order, default.",
-                "service": "string, optional. One or more of official, freeShipping, COD, flashsale, default.",
-            },
-        },
-        {
-            "name": "view_product_information",
-            "description": "Fetch product descriptions, SKU options, and attributes for comma-separated product_ids.",
-            "parameters": {"product_ids": "string, required. Comma-separated product ids."},
-        },
-        {
-            "name": "recommend_product",
-            "description": "Recommend selected product ids to the user.",
-            "parameters": {"product_ids": "string, required. Comma-separated product ids in request order."},
-        },
-        {
-            "name": "python_execute",
-            "description": "Execute Python code string.",
-            "parameters": {"code": "string, required. Python code that prints results."},
-        },
-        {
-            "name": "terminate",
-            "description": "End the dialogue with success or failure.",
-            "parameters": {"status": "string, required. success or failure."},
-        },
-    ]
-    lines = []
-    for idx, tool in enumerate(tools, 1):
-        lines.append(f"{idx}. Name: {tool['name']}")
-        lines.append(f"Description: {tool['description']}")
-        lines.append(f"Parameters: {json.dumps(tool['parameters'], ensure_ascii=False)}")
-        lines.append("")
-    return "\n".join(lines).strip()
+    return shared_tool_schema_text(exclude_tools={"web_search"})
 
 
 def build_system_prompt(prompt_file: Path) -> str:
-    prompt = prompt_file.read_text(encoding="utf-8").strip()
-    return prompt.replace("<|toolkit_description|>", tool_schema_text())
+    return shared_build_system_prompt(prompt_file, exclude_tools={"web_search"})
 
 
 def product_ids_from_query_rows(rows: list[dict]) -> set[str]:
@@ -273,6 +241,8 @@ def prepare_query(args, tokenizer) -> dict:
     report = {
         "source": args.query_file,
         "meta": args.query_meta_file,
+        "prompt_file": args.prompt_file,
+        "system_prompt_chars": len(system_prompt),
         "max_prompt_length": args.query_max_prompt_length,
         "product_cache": cache_report,
         "source_distribution": summarize_query_rows(rows),

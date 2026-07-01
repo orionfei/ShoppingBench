@@ -690,6 +690,8 @@ def build_dataset(args) -> dict:
         "source": args.input,
         "output_jsonl": args.output_jsonl,
         "output_dir": args.output_dir,
+        "prompt_file": args.prompt_file,
+        "system_prompt_chars": len(system_prompt),
         "split_mode": args.split_mode,
         "trajectories": len(split_rows),
         "view_shortlist_top_k_per_search": args.view_shortlist_top_k_per_search,

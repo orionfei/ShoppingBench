@@ -12,23 +12,17 @@ from toolkit import tools, toolmap
 from util.llm import ask_llm
 from util.message import Message, USER_ROLES, ASSISTANT_ROLES
 from util.history_compression import build_state_folded_user_prompt
+from util.system_prompt import build_system_prompt
 
 
 MAX_STEPS = 30
 
 
 def get_system_prompt(config: dict) -> str:
-    with open(config["system_prompt_file"], "r") as fin:
-        prompt_template = fin.read().strip()
-
-    description = []
-    for i, tool in enumerate(tools):
-        if tool.name in config.get("exclude_tools", []):
-            continue
-        description.append(f"{i+1}. {tool.to_string()}")
-    toolkit_description = "\n\n".join(description)
-
-    return prompt_template.replace("<|toolkit_description|>", toolkit_description)
+    return build_system_prompt(
+        config["system_prompt_file"],
+        exclude_tools=config.get("exclude_tools", []),
+    )
 
 
 def get_user_prompt(message: Message, history_messages: list[str], config: dict | None = None) -> str:
