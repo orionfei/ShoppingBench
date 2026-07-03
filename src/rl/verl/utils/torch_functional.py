@@ -16,6 +16,7 @@ Contain small torch utilities
 """
 
 import math
+import os
 from contextlib import contextmanager
 from typing import Optional
 
@@ -81,6 +82,28 @@ def logprobs_from_logits(logits, labels, inplace_backward=True):
     if FLAH_ATTN_CROSS_ENTROPY_LOSS_AVAILABLE:
         batch_dim = logits.shape[:-1]
         last_dim = logits.shape[-1]
+        chunk_size = int(os.environ.get("VERL_LOGPROBS_CHUNK_SIZE", "4096"))
+        if chunk_size > 0 and logits.dim() == 3 and logits.shape[0] * logits.shape[1] > chunk_size:
+            outputs = []
+            for start in range(0, logits.shape[1], chunk_size):
+                end = min(start + chunk_size, logits.shape[1])
+                chunk_logits = logits[:, start:end, :].reshape(-1, last_dim)
+                chunk_labels = labels[:, start:end].reshape(-1)
+                chunk_output = logprobs_from_logits_flash_attn(
+                    chunk_logits, chunk_labels, inplace_backward=inplace_backward
+                )
+                outputs.append(chunk_output.view(logits.shape[0], end - start))
+            return torch.cat(outputs, dim=1).view(*batch_dim)
+        if chunk_size > 0 and logits.dim() == 2 and logits.shape[0] > chunk_size:
+            outputs = []
+            for start in range(0, logits.shape[0], chunk_size):
+                end = min(start + chunk_size, logits.shape[0])
+                outputs.append(
+                    logprobs_from_logits_flash_attn(
+                        logits[start:end, :], labels[start:end], inplace_backward=inplace_backward
+                    )
+                )
+            return torch.cat(outputs, dim=0).view(*batch_dim)
         logits = logits.reshape(-1, last_dim)
         labels = labels.reshape(-1)
         output = logprobs_from_logits_flash_attn(logits, labels, inplace_backward=inplace_backward)

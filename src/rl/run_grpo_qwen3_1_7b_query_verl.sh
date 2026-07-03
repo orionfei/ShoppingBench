@@ -40,6 +40,8 @@ ROLLOUT_TEMPERATURE="${ROLLOUT_TEMPERATURE:-1.0}"
 ROLLOUT_TOP_P="${ROLLOUT_TOP_P:-0.9}"
 ROLLOUT_GPU_MEMORY_UTILIZATION="${ROLLOUT_GPU_MEMORY_UTILIZATION:-0.38}"
 ROLLOUT_TENSOR_MODEL_PARALLEL_SIZE="${ROLLOUT_TENSOR_MODEL_PARALLEL_SIZE:-1}"
+ROLLOUT_ENFORCE_EAGER="${ROLLOUT_ENFORCE_EAGER:-False}"
+ROLLOUT_FREE_CACHE_ENGINE="${ROLLOUT_FREE_CACHE_ENGINE:-False}"
 ROLLOUT_MODE="${ROLLOUT_MODE:-async}"
 ROLLOUT_NAME="${ROLLOUT_NAME:-vllm}"
 if [[ "$ROLLOUT_NAME" == "vllm" && "$ROLLOUT_MODE" == "async" && "$VLLM_USE_V1" != "1" ]]; then
@@ -70,6 +72,7 @@ KL_LOSS_TYPE="${KL_LOSS_TYPE:-low_var_kl}"
 REF_PARAM_OFFLOAD="${REF_PARAM_OFFLOAD:-True}"
 ACTOR_OPTIMIZER_OFFLOAD="${ACTOR_OPTIMIZER_OFFLOAD:-True}"
 ACTOR_OPTIMIZER_FOREACH="${ACTOR_OPTIMIZER_FOREACH:-false}"
+ACTOR_FSDP_MODEL_DTYPE="${ACTOR_FSDP_MODEL_DTYPE:-bf16}"
 ENTROPY_FROM_LOGITS_WITH_CHUNKING="${ENTROPY_FROM_LOGITS_WITH_CHUNKING:-True}"
 ENTROPY_COEFF="${ENTROPY_COEFF:-0}"
 LEARNING_RATE="${LEARNING_RATE:-1e-6}"
@@ -98,6 +101,11 @@ if [[ -z "${PYTHON_BIN:-}" ]]; then
   else
     PYTHON_BIN="python3"
   fi
+fi
+
+ACTOR_FSDP_MODEL_DTYPE_ARGS=()
+if [[ -n "$ACTOR_FSDP_MODEL_DTYPE" ]]; then
+  ACTOR_FSDP_MODEL_DTYPE_ARGS=(+actor_rollout_ref.actor.fsdp_config.model_dtype="$ACTOR_FSDP_MODEL_DTYPE")
 fi
 
 "$PYTHON_BIN" -m verl.trainer.main_ppo \
@@ -132,6 +140,7 @@ fi
   actor_rollout_ref.actor.optim.lr="$LEARNING_RATE" \
   actor_rollout_ref.actor.optim.foreach="$ACTOR_OPTIMIZER_FOREACH" \
   actor_rollout_ref.actor.fsdp_config.optimizer_offload="$ACTOR_OPTIMIZER_OFFLOAD" \
+  "${ACTOR_FSDP_MODEL_DTYPE_ARGS[@]}" \
   actor_rollout_ref.actor.checkpoint.save_contents="$ACTOR_CHECKPOINT_SAVE_CONTENTS" \
   actor_rollout_ref.actor.checkpoint.load_contents="$ACTOR_CHECKPOINT_LOAD_CONTENTS" \
   actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu="$LOG_PROB_MICRO_BATCH_SIZE_PER_GPU" \
@@ -141,6 +150,8 @@ fi
   actor_rollout_ref.rollout.temperature="$ROLLOUT_TEMPERATURE" \
   actor_rollout_ref.rollout.top_p="$ROLLOUT_TOP_P" \
   actor_rollout_ref.rollout.dtype=bfloat16 \
+  actor_rollout_ref.rollout.enforce_eager="$ROLLOUT_ENFORCE_EAGER" \
+  actor_rollout_ref.rollout.free_cache_engine="$ROLLOUT_FREE_CACHE_ENGINE" \
   actor_rollout_ref.rollout.gpu_memory_utilization="$ROLLOUT_GPU_MEMORY_UTILIZATION" \
   actor_rollout_ref.rollout.tensor_model_parallel_size="$ROLLOUT_TENSOR_MODEL_PARALLEL_SIZE" \
   actor_rollout_ref.rollout.max_num_batched_tokens="$ROLLOUT_MAX_NUM_BATCHED_TOKENS" \

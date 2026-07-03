@@ -20,18 +20,11 @@ LEGAL_TOOLS = {
 }
 
 PROGRESS_WEIGHTS = {
-    "search_gold_recall": 0.18,
-    "select_gold_f1": 0.18,
-    "verify_gold_f1": 0.12,
-    "shop_constraint_correct": 0.08,
-    "budget_attempt_quality": 0.10,
-    "budget_recomputed_correct": 0.12,
-    "budget_numeric_alignment": 0.12,
-    "within_budget_correct": 0.10,
-    "recommend_gold_f1": 0.35,
-    "recommend_count_match": 0.12,
-    "set_exact": 0.25,
-    "terminate_quality": 0.10,
+    "find_correct": 0.20,
+    "view_confirmed": 0.20,
+    "budget_correct": 0.20,
+    "recommend_correct": 0.30,
+    "terminate_complete": 0.10,
 }
 
 
@@ -300,9 +293,64 @@ def _events_from_messages(messages: list[dict[str, Any]]) -> tuple[list[str], li
 def _states_from_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     states = []
     for message in messages:
+        if message.get("role") != "user":
+            continue
         content = _content_to_text(message.get("content", ""))
         states.extend(_extract_state_snapshots(content))
     return states
+
+
+def _tool_calls_from_message(message: dict[str, Any]) -> list[dict[str, Any]]:
+    content = _content_to_text(message.get("content", ""))
+    calls = []
+    if message.get("tool_calls") is not None:
+        calls.extend(call for call in (_normalize_call(item) for item in message.get("tool_calls") or []) if call)
+    direct_calls = message.get("tool_call")
+    if direct_calls is not None:
+        calls.extend(call for call in (_normalize_call(item) for item in direct_calls or []) if call)
+    if not calls:
+        calls.extend(_parse_tool_calls(content))
+    return calls
+
+
+def _workflow_validity(messages: list[dict[str, Any]]) -> float:
+    saw_find = False
+    saw_view = False
+    saw_budget = False
+    saw_recommend = False
+    saw_terminate = False
+
+    for message in messages:
+        if message.get("role") != "assistant" and message.get("tool_calls") is None and message.get("tool_call") is None:
+            continue
+        calls = _tool_calls_from_message(message)
+        if len(calls) > 1 and not all(call.get("name") == "find_product" for call in calls):
+            return 0.0
+        for call in calls:
+            name = call.get("name")
+            if name not in LEGAL_TOOLS or saw_terminate:
+                return 0.0
+            if name == "find_product":
+                if saw_view or saw_budget or saw_recommend:
+                    return 0.0
+                saw_find = True
+            elif name == "view_product_information":
+                if not saw_find or saw_budget or saw_recommend:
+                    return 0.0
+                saw_view = True
+            elif name == "python_execute":
+                if not saw_view or saw_recommend:
+                    return 0.0
+                saw_budget = True
+            elif name == "recommend_product":
+                if not saw_budget:
+                    return 0.0
+                saw_recommend = True
+            elif name == "terminate":
+                if not saw_recommend:
+                    return 0.0
+                saw_terminate = True
+    return 1.0
 
 
 @lru_cache(maxsize=1)
@@ -555,25 +603,31 @@ def _budget_numeric_alignment(budget_calcs: list[dict[str, Any]], recomputed: di
     calc = next((item for item in reversed(budget_calcs) if isinstance(item, dict)), None)
     if calc is None:
         return 0.0
+    required_keys = {"product_ids", "shop_ids", "budget", "voucher_used"}
+    if not required_keys.issubset(calc):
+        return 0.0
 
     scores = []
     claimed_total = _first_float(calc, ("total_before_voucher", "total", "subtotal", "original_total"))
-    if claimed_total is not None:
-        scores.append(_numeric_match_score(claimed_total, recomputed.get("total_before_voucher")))
+    if claimed_total is None:
+        return 0.0
+    scores.append(_numeric_match_score(claimed_total, recomputed.get("total_before_voucher")))
 
     claimed_payable = _first_float(calc, ("payable_total", "payable", "final_total", "price_after_voucher"))
-    if claimed_payable is not None:
-        scores.append(_numeric_match_score(claimed_payable, recomputed.get("payable_total")))
+    if claimed_payable is None:
+        return 0.0
+    scores.append(_numeric_match_score(claimed_payable, recomputed.get("payable_total")))
 
     claimed_within_budget = None
     for key in ("within_budget", "is_within_budget", "budget_ok", "within"):
         if key in calc:
             claimed_within_budget = _to_bool(calc.get(key))
             break
-    if claimed_within_budget is not None and recomputed.get("within_budget") is not None:
-        scores.append(1.0 if claimed_within_budget == bool(recomputed.get("within_budget")) else 0.0)
+    if claimed_within_budget is None or recomputed.get("within_budget") is None:
+        return 0.0
+    scores.append(1.0 if claimed_within_budget == bool(recomputed.get("within_budget")) else 0.0)
 
-    return sum(scores) / len(scores) if scores else 0.0
+    return sum(scores) / len(scores)
 
 
 def _recommend_count_penalty(recommended_count: int, expected_count: int) -> float:
@@ -870,6 +924,7 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
     messages = _messages_from_extra(extra_info, solution_str or "")
     assistant_texts, events = _events_from_messages(messages)
     states = _states_from_messages(messages)
+    workflow_valid = _workflow_validity(messages)
     message_count = len(messages)
     assistant_message_count = sum(1 for message in messages if message.get("role") == "assistant")
     user_obs_message_count = sum(
@@ -889,6 +944,8 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
     selected_ids = state["selected_ids"]
     recommended_ids = state["recommended_ids"]
     budget_ids = selected_ids or recommended_ids
+    budget_ids_viewed = 1.0 if budget_ids and set(budget_ids).issubset(viewed_ids) else 0.0
+    recommended_ids_budgeted = 1.0 if recommended_ids and set(recommended_ids).issubset(set(budget_ids)) else 0.0
     selected_budget = _recompute_budget(budget_ids, products_by_id, voucher)
     recommended_budget = _recompute_budget(recommended_ids, products_by_id, voucher)
 
@@ -934,28 +991,40 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
     )
     semantic_set_exact_success = max(set_exact_success, recommend_attribute_exact)
     terminate_quality = recommend_relevance_f1 if state["terminate_success"] and recommended_ids else 0.0
-
-    progress_components = {
-        "search_gold_recall": search_gold_recall,
-        "select_gold_f1": select_relevance_f1,
-        "verify_gold_f1": verify_relevance_f1,
-        "shop_constraint_correct": shop_constraint_correct,
-        "budget_attempt_quality": budget_attempt_quality,
-        "budget_recomputed_correct": budget_recomputed_correct,
-        "budget_numeric_alignment": budget_numeric_alignment,
-        "within_budget_correct": within_budget_correct,
-        "recommend_gold_f1": recommend_relevance_f1,
-        "recommend_count_match": recommend_count_match,
-        "set_exact": semantic_set_exact_success,
-        "terminate_quality": terminate_quality,
-    }
-    progress = sum(PROGRESS_WEIGHTS[key] * progress_components[key] for key in PROGRESS_WEIGHTS)
-
+    recommended_shop_constraint = _same_shop_correct(recommended_ids, products_by_id, voucher) if recommended_ids else 0.0
     exact_success = semantic_set_exact_success
     budget_success = 1.0 if semantic_set_exact_success and recommended_budget.get("within_budget") else 0.0
     terminate_after_valid_recommend = 1.0 if state["terminate_success"] and budget_success else 0.0
     final_success = 1.0 if budget_success and state["terminate_success"] else 0.0
-    outcome = 1.5 * final_success + 0.5 * budget_success + 0.25 * semantic_set_exact_success
+
+    find_correct = min(workflow_valid, search_gold_recall)
+    view_confirmed = min(find_correct, verify_relevance_f1)
+    budget_correct = min(
+        view_confirmed,
+        budget_ids_viewed,
+        shop_constraint_correct,
+        budget_attempt_quality,
+        budget_recomputed_correct,
+        budget_numeric_alignment,
+        within_budget_correct,
+    )
+    recommend_correct = min(budget_correct, recommended_ids_budgeted, recommend_relevance_f1)
+    terminate_complete = min(
+        recommend_correct,
+        terminate_after_valid_recommend,
+        1.0 if state["terminate_success"] else 0.0,
+    )
+    progress_components = {
+        "find_correct": find_correct,
+        "view_confirmed": view_confirmed,
+        "budget_correct": budget_correct,
+        "recommend_correct": recommend_correct,
+        "terminate_complete": terminate_complete,
+    }
+    progress = sum(PROGRESS_WEIGHTS[key] * progress_components[key] for key in PROGRESS_WEIGHTS)
+
+    # Keep outcome in the returned metrics, but do not double-count final success in reward.
+    outcome = 0.0
 
     steps = max(1, len(assistant_texts))
     step_penalty = _env_float("SHOPPINGBENCH_STEP_PENALTY", 0.005) * steps
@@ -964,7 +1033,9 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
     premature_terminate_penalty = 0.10 if state["terminate_success"] and not recommended_ids else 0.0
     invalid_tool_penalty = 0.05 * (1.0 - tool_valid)
     penalties = step_penalty + wrong_recommend_penalty + count_penalty + premature_terminate_penalty + invalid_tool_penalty
-    task_reward = progress + outcome - penalties
+    task_reward = progress - penalties
+    if protocol_reward < 1.0 or workflow_valid < 1.0:
+        task_reward = min(task_reward, 0.0)
     protocol_weight = _protocol_weight(extra_info)
     score = task_reward + protocol_weight * protocol_reward
 
@@ -976,7 +1047,13 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
         "tool_valid": tool_valid,
         "protocol": protocol_reward,
         "protocol_weight": protocol_weight,
+        "workflow_valid": workflow_valid,
         "progress": progress,
+        "find_correct": progress_components["find_correct"],
+        "view_confirmed": progress_components["view_confirmed"],
+        "budget_correct": progress_components["budget_correct"],
+        "recommend_correct": progress_components["recommend_correct"],
+        "terminate_complete": progress_components["terminate_complete"],
         "outcome": outcome,
         "task": task_reward,
         "exact": exact_success,
@@ -987,6 +1064,7 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
         "budget": budget_success,
         "terminate": 1.0 if state["terminate_success"] else 0.0,
         "same_shop": same_shop_correct,
+        "recommended_same_shop": recommended_shop_constraint,
         "step_penalty": step_penalty,
         "wrong_recommend_penalty": wrong_recommend_penalty,
         "count_penalty": count_penalty,
@@ -1014,6 +1092,8 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
         "verify_attribute_f1": viewed_attribute_f1,
         "verify_relevance_f1": verify_relevance_f1,
         "shop_constraint_correct": shop_constraint_correct,
+        "budget_ids_viewed": budget_ids_viewed,
+        "recommended_ids_budgeted": recommended_ids_budgeted,
         "budget_attempted": 1.0 if state["budget_attempted"] else 0.0,
         "budget_attempt_quality": budget_attempt_quality,
         "budget_gold_f1": budget_gold_f1,

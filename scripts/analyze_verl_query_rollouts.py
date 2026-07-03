@@ -17,8 +17,14 @@ CORE_METRICS = [
     "protocol",
     "format",
     "tool_valid",
+    "workflow_valid",
     "task",
     "progress",
+    "find_correct",
+    "view_confirmed",
+    "budget_correct",
+    "recommend_correct",
+    "terminate_complete",
     "outcome",
     "final_success",
     "search_gold_recall",
@@ -129,6 +135,13 @@ def summarize(rows: list[dict[str, Any]], group_size: int) -> dict[str, Any]:
         recommended = [str(item.get("recommended_ids") or "") for item in items]
         summary["recommended_unique"] = len(set(recommended))
         summary["recommended_nonempty_rate"] = mean([1.0 if item else 0.0 for item in recommended])
+        summary["valid_rollout_count"] = sum(
+            1
+            for item in items
+            if float(item.get("protocol") or 0.0) >= 1.0 and float(item.get("workflow_valid") or 0.0) >= 1.0
+        )
+        summary["rows_without_tool_block"] = sum(1 for item in items if "<tool_call>" not in str(item.get("output") or ""))
+        summary["output_len_max"] = max([len(str(item.get("output") or "")) for item in items], default=0)
         query_summaries.append(summary)
 
     aggregate: dict[str, Any] = {
@@ -146,6 +159,9 @@ def summarize(rows: list[dict[str, Any]], group_size: int) -> dict[str, Any]:
     aggregate["recommended_nonempty_rate_mean"] = mean(
         [float(item["recommended_nonempty_rate"]) for item in query_summaries]
     )
+    aggregate["per_prompt_valid_count_mean"] = mean([float(item["valid_rollout_count"]) for item in query_summaries])
+    aggregate["rows_without_tool_block"] = sum(int(item["rows_without_tool_block"]) for item in query_summaries)
+    aggregate["output_len_max"] = max([int(item["output_len_max"]) for item in query_summaries], default=0)
 
     return {
         "aggregate": aggregate,
