@@ -60,39 +60,32 @@ DEFAULT_MODEL_CONFIG = {
     "max_completion_tokens": 512,
     "extra_body": {"thinking": {"type": "disabled"}},
 }
-PRODUCT_COUNT_WEIGHTS = {1: 0.088, 2: 0.305, 3: 0.317, 4: 0.290}
-VOUCHER_TYPE_WEIGHTS = {"platform": 0.40, "shop": 0.60}
+PRODUCT_VOUCHER_JOINT_WEIGHTS = {
+    (1, "platform"): 0.15,
+    (2, "platform"): 0.07,
+    (2, "shop"): 0.18,
+    (3, "platform"): 0.09,
+    (3, "shop"): 0.21,
+    (4, "platform"): 0.09,
+    (4, "shop"): 0.21,
+}
 DISCOUNT_TYPE_WEIGHTS = {"fixed": 0.40, "percentage": 0.60}
-THRESHOLD_BUCKETS = {
-    "low": (0.25, 0.20, 0.50),
-    "mid": (0.50, 0.50, 0.80),
-    "high": (0.25, 0.80, 0.95),
-}
-BUDGET_SLACK_BUCKETS = {
-    "hard": (0.35, 1.00, 1.02),
-    "medium": (0.45, 1.02, 1.06),
-    "easy": (0.20, 1.06, 1.10),
-}
-STYLE_BUCKET_WEIGHTS = {
-    "conversational": 0.70,
-    "brief": 0.15,
-    "list-like": 0.15,
-}
-STYLE_INSTRUCTIONS = {
-    "brief": (
-        "Write the query as a concise shopping request in one short sentence when possible. "
-        "Include every specified product requirement."
-    ),
-    "conversational": (
-        "Write the query in a natural shopping-request style. Include every specified "
-        "product requirement, but do not default to First/Second/Third sequencing; use "
-        "natural connectors such as and, also, plus, or commas unless the query would be unclear."
-    ),
-    "list-like": (
-        "Write the query in a list-like or semicolon-separated style that clearly separates "
-        "the requested products. First/Second/Third wording or numbered fragments are allowed. "
-        "Include every specified product requirement."
-    ),
+DIFFICULTY_BUCKETS = {
+    "easy": {
+        "weight": 0.25,
+        "threshold_ratio": (0.20, 0.55),
+        "budget_slack": (1.06, 1.12),
+    },
+    "medium": {
+        "weight": 0.45,
+        "threshold_ratio": (0.50, 0.80),
+        "budget_slack": (1.03, 1.07),
+    },
+    "hard": {
+        "weight": 0.30,
+        "threshold_ratio": (0.80, 0.95),
+        "budget_slack": (1.00, 1.03),
+    },
 }
 OPENER_BUCKET_WEIGHTS = {
     "im_looking": 0.45,
@@ -148,59 +141,29 @@ def expand_quota(quotas: dict):
     return values
 
 
-def build_sampling_specs(total: int, voucher_type_weights: dict | None = None):
-    voucher_type_weights = voucher_type_weights or VOUCHER_TYPE_WEIGHTS
-    product_counts = expand_quota(largest_remainder_quota(total, PRODUCT_COUNT_WEIGHTS))
-    voucher_types = expand_quota(largest_remainder_quota(total, voucher_type_weights))
+def build_sampling_specs(total: int):
+    product_voucher_pairs = expand_quota(largest_remainder_quota(total, PRODUCT_VOUCHER_JOINT_WEIGHTS))
     discount_types = expand_quota(largest_remainder_quota(total, DISCOUNT_TYPE_WEIGHTS))
-    style_buckets = expand_quota(largest_remainder_quota(total, STYLE_BUCKET_WEIGHTS))
-    threshold_buckets = expand_quota(
-        largest_remainder_quota(total, {k: v[0] for k, v in THRESHOLD_BUCKETS.items()})
-    )
-    budget_buckets = expand_quota(
-        largest_remainder_quota(total, {k: v[0] for k, v in BUDGET_SLACK_BUCKETS.items()})
+    difficulty_buckets = expand_quota(
+        largest_remainder_quota(total, {k: v["weight"] for k, v in DIFFICULTY_BUCKETS.items()})
     )
 
-    random.shuffle(product_counts)
-    random.shuffle(voucher_types)
+    random.shuffle(product_voucher_pairs)
     random.shuffle(discount_types)
-    random.shuffle(style_buckets)
-    random.shuffle(threshold_buckets)
-    random.shuffle(budget_buckets)
+    random.shuffle(difficulty_buckets)
 
     specs = []
     for idx in range(total):
-        n_products = product_counts[idx]
-        voucher_type = voucher_types[idx]
-        if n_products == 1:
-            voucher_type = "platform"
+        n_products, voucher_type = product_voucher_pairs[idx]
         specs.append(
             {
                 "sample_id": f"voucher_train_{idx:06d}",
                 "n_products": n_products,
                 "voucher_type": voucher_type,
                 "discount_type": discount_types[idx],
-                "threshold_bucket": threshold_buckets[idx],
-                "budget_slack_bucket": budget_buckets[idx],
-                "style_bucket": style_buckets[idx],
+                "difficulty_bucket": difficulty_buckets[idx],
             }
         )
-    return rebalance_voucher_types(specs, total, voucher_type_weights)
-
-
-def rebalance_voucher_types(specs: list[dict], total: int, voucher_type_weights: dict | None = None):
-    target = largest_remainder_quota(total, voucher_type_weights or VOUCHER_TYPE_WEIGHTS)
-    counts = Counter(spec["voucher_type"] for spec in specs)
-    platform_extra = counts["platform"] - target["platform"]
-    if platform_extra <= 0:
-        return specs
-
-    for spec in specs:
-        if platform_extra <= 0:
-            break
-        if spec["voucher_type"] == "platform" and spec["n_products"] > 1:
-            spec["voucher_type"] = "shop"
-            platform_extra -= 1
     return specs
 
 
@@ -239,9 +202,9 @@ def sample_products(
     return random.sample(random.choice(candidate_shops), n_products)
 
 
-def sample_threshold(total_price: float, bucket: str):
-    _, low, high = THRESHOLD_BUCKETS[bucket]
-    lower = max(1, int(math.floor(total_price * low)))
+def sample_threshold(total_price: float, difficulty_bucket: str):
+    low, high = DIFFICULTY_BUCKETS[difficulty_bucket]["threshold_ratio"]
+    lower = max(1, int(math.ceil(total_price * low)))
     upper = max(lower, int(math.floor(total_price * high)))
     threshold = random.randint(lower, upper)
     return min(threshold, int(math.floor(total_price)))
@@ -251,14 +214,13 @@ def build_voucher(
     products: list[dict],
     voucher_type: str,
     discount_type: str,
-    threshold_bucket: str,
-    budget_slack_bucket: str,
+    difficulty_bucket: str,
 ):
     total_price = sum(float(product["price"]) for product in products)
     if total_price < 100:
         return None
 
-    threshold = sample_threshold(total_price, threshold_bucket)
+    threshold = sample_threshold(total_price, difficulty_bucket)
     face_value = None
     discount = None
     cap = None
@@ -277,8 +239,10 @@ def build_voucher(
         discount = discount_percent / 100.0
         price_after_voucher = max(total_price * (1 - discount), total_price - cap)
 
-    _, low_slack, high_slack = BUDGET_SLACK_BUCKETS[budget_slack_bucket]
-    budget = math.ceil(price_after_voucher * random.uniform(low_slack, high_slack))
+    low_slack, high_slack = DIFFICULTY_BUCKETS[difficulty_bucket]["budget_slack"]
+    lower_budget = max(math.ceil(price_after_voucher), int(math.ceil(price_after_voucher * low_slack)))
+    upper_budget = max(lower_budget, int(math.floor(price_after_voucher * high_slack)))
+    budget = random.randint(lower_budget, upper_budget)
     if budget < price_after_voucher:
         budget = math.ceil(price_after_voucher)
 
@@ -381,7 +345,7 @@ def sample_product_fields(product: dict):
     return reward, requirements, {"target_field_count": target_count, "field_bucket": field_bucket}
 
 
-def build_prompt(prompt_template: str, requirement_list: list[list[str]], style_bucket: str):
+def build_prompt(prompt_template: str, requirement_list: list[list[str]]):
     if len(requirement_list) == 1:
         blocks = ["\n".join(requirement_list[0])]
     else:
@@ -389,13 +353,9 @@ def build_prompt(prompt_template: str, requirement_list: list[list[str]], style_
             f"## Product {idx}\n" + "\n".join(requirements)
             for idx, requirements in enumerate(requirement_list, start=1)
         ]
-    prompt = (
+    return (
         prompt_template.replace("<|task|>", "one or more products")
         .replace("<|requirements|>", "\n\n".join(blocks))
-    )
-    return (
-        f"{prompt}\n\n# Query Style\n"
-        f"{STYLE_INSTRUCTIONS[style_bucket]} Do not mention product prices."
     )
 
 
@@ -407,12 +367,9 @@ def assign_opener_buckets(rows: list[dict], seed: int):
 
 
 def stage3_prompt(row: dict, opener_bucket: str):
-    style_bucket = row.get("sampling_buckets", {}).get("style_bucket", "conversational")
-    style_instruction = STYLE_INSTRUCTIONS.get(style_bucket, STYLE_INSTRUCTIONS["conversational"])
     opener_instruction = OPENER_INSTRUCTIONS[opener_bucket]
     return (
         f"{row['prompt']}\n\n# Stage III Query Control\n"
-        f"{style_instruction}\n"
         f"{opener_instruction}.\n"
         "Do not start with a generic phrase like \"I need a few different items\" unless it is "
         "required by the opener above. Do not mention product prices. Return only the JSON object."
@@ -434,7 +391,10 @@ def build_plan_item(
         requirement_list.append(requirements)
         field_buckets.append(field_meta)
 
-    prompt = build_prompt(prompt_template, requirement_list, spec["style_bucket"])
+    total_price_before_voucher = sum(float(product["price"]) for product in products)
+    threshold_ratio = voucher["threshold"] / total_price_before_voucher
+    budget_slack = voucher["budget"] / voucher["price_after_voucher"]
+    prompt = build_prompt(prompt_template, requirement_list)
     external = (
         f"My budget is only `{voucher['budget']}`, but I have a voucher "
         f"with the following rules:\n{describe_voucher(voucher)}"
@@ -445,7 +405,7 @@ def build_plan_item(
         "sampled_products": [product_snapshot(product) for product in products],
         "sampled_product_ids": [product["product_id"] for product in products],
         "sampled_shop_ids": sorted({str(product.get("shop_id")) for product in products}),
-        "total_price_before_voucher": sum(float(product["price"]) for product in products),
+        "total_price_before_voucher": total_price_before_voucher,
         "requirements": requirement_list,
         "prompt": prompt,
         "external_budget_and_voucher": external,
@@ -455,9 +415,9 @@ def build_plan_item(
             "n_products": spec["n_products"],
             "voucher_type": spec["voucher_type"],
             "discount_type": spec["discount_type"],
-            "threshold_bucket": spec["threshold_bucket"],
-            "budget_slack_bucket": spec["budget_slack_bucket"],
-            "style_bucket": spec["style_bucket"],
+            "difficulty_bucket": spec["difficulty_bucket"],
+            "threshold_ratio": threshold_ratio,
+            "budget_slack": budget_slack,
             "field_buckets": field_buckets,
             "title_only_product_count": sum(1 for requirements in requirement_list if len(requirements) == 1),
         },
@@ -556,7 +516,7 @@ def generate_plan(args):
     if len(products) < 4:
         raise ValueError("Not enough products loaded for voucher sampling.")
 
-    specs = build_sampling_specs(args.total, parse_voucher_type_weights(args.voucher_type_weights))
+    specs = build_sampling_specs(args.total)
     total_sampled_products = sum(spec["n_products"] for spec in specs)
     title_only_limit = math.ceil(total_sampled_products * args.max_title_only_product_ratio)
     title_only_count = 0
@@ -579,8 +539,7 @@ def generate_plan(args):
                 selected,
                 spec["voucher_type"],
                 spec["discount_type"],
-                spec["threshold_bucket"],
-                spec["budget_slack_bucket"],
+                spec["difficulty_bucket"],
             )
             if not voucher:
                 continue
@@ -610,26 +569,6 @@ def validate_plan(rows: list[dict]):
     used = set()
     for row in rows:
         validate_plan_item(row, used)
-
-
-def parse_voucher_type_weights(raw: str):
-    weights = {}
-    for part in raw.split(","):
-        if not part.strip():
-            continue
-        key, sep, value = part.partition("=")
-        if not sep:
-            raise ValueError(f"Invalid voucher type weight item: {part!r}")
-        key = key.strip()
-        if key not in {"platform", "shop"}:
-            raise ValueError(f"Invalid voucher type: {key!r}")
-        weights[key] = float(value)
-    if set(weights) != {"platform", "shop"}:
-        raise ValueError("--voucher-type-weights must include platform and shop.")
-    if any(value < 0 for value in weights.values()) or sum(weights.values()) <= 0:
-        raise ValueError("--voucher-type-weights values must be non-negative and sum positive.")
-    total = sum(weights.values())
-    return {key: value / total for key, value in weights.items()}
 
 
 def load_jsonl(path: Path):
@@ -748,10 +687,13 @@ def generate_one_from_plan(row: dict, opener_bucket: str, model_config: dict, ar
         return row["sample_id"], None, None
     final = {"query": query, "reward": row["reward"], "voucher": row["voucher"]}
     validate_final_item(final)
+    sampling_buckets = row["sampling_buckets"]
     metadata = {
         "sample_id": row["sample_id"],
-        "style_bucket": row.get("sampling_buckets", {}).get("style_bucket"),
         "opener_bucket": opener_bucket,
+        "difficulty_bucket": sampling_buckets["difficulty_bucket"],
+        "threshold_ratio": sampling_buckets["threshold_ratio"],
+        "budget_slack": sampling_buckets["budget_slack"],
     }
     return row["sample_id"], final, metadata
 
@@ -814,14 +756,24 @@ def summarize_jsonl(path: Path, is_plan: bool):
         print(f"{path}: {len(rows)} plan rows")
         print("product counts:", dict(Counter(row["sampling_buckets"]["n_products"] for row in rows)))
         print("voucher types:", dict(Counter(row["voucher"]["voucher_type"] for row in rows)))
+        print(
+            "product/voucher joint:",
+            dict(
+                Counter(
+                    f"{row['sampling_buckets']['n_products']}P+{row['voucher']['voucher_type']}"
+                    for row in rows
+                )
+            ),
+        )
         print("discount types:", dict(Counter(row["voucher"]["discount_type"] for row in rows)))
-        print("style buckets:", dict(Counter(row["sampling_buckets"].get("style_bucket") for row in rows)))
+        print("difficulty buckets:", dict(Counter(row["sampling_buckets"]["difficulty_bucket"] for row in rows)))
         first = rows[0]
         preview = {
             "sample_id": first["sample_id"],
             "sampled_product_ids": first["sampled_product_ids"],
             "requirements": first["requirements"],
             "voucher": first["voucher"],
+            "sampling_buckets": first["sampling_buckets"],
             "prompt": first["prompt"][:500],
         }
         print(json.dumps(preview, ensure_ascii=False, indent=2))
@@ -844,7 +796,6 @@ def parse_args():
     parser.add_argument("--metadata-output", default=None)
     parser.add_argument("--total", type=int, default=750)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--voucher-type-weights", default="platform=0.40,shop=0.60")
     parser.add_argument("--max-docs", type=int, default=100000)
     parser.add_argument("--max-attempts-per-item", type=int, default=1000)
     parser.add_argument("--max-title-only-product-ratio", type=float, default=0.10)
