@@ -88,10 +88,10 @@ DIFFICULTY_BUCKETS = {
     },
 }
 OPENER_BUCKET_WEIGHTS = {
-    "im_looking": 0.45,
+    "im_looking": 0.25,
     "looking_for": 0.25,
-    "show_me": 0.20,
-    "find": 0.10,
+    "show_me": 0.25,
+    "find": 0.25,
 }
 OPENER_INSTRUCTIONS = {
     "im_looking": "Start the query with exactly: I'm looking for",
@@ -268,9 +268,9 @@ def describe_voucher(voucher: dict):
     if voucher["discount_type"] == "fixed":
         lines.append(f"3. It provides a fixed discount of `{voucher['face_value']}`.")
     else:
-        percent = voucher["discount"] * 100
+        percent = round(voucher["discount"] * 100)
         lines.append(
-            f"3. It provides a percentage discount of `{percent:.1f}%` "
+            f"3. It provides a percentage discount of `{percent}%` "
             f"with a cap of `{voucher['cap']}`."
         )
     return "\n".join(lines)
@@ -371,6 +371,10 @@ def stage3_prompt(row: dict, opener_bucket: str):
     return (
         f"{row['prompt']}\n\n# Stage III Query Control\n"
         f"{opener_instruction}.\n"
+        "Write the main query as a natural shopping request, not as a field checklist or rigid enumeration. "
+        "For multiple products, connect them naturally with words like and, also, plus, or short sentences. "
+        "A natural closing such as \"Please show me these products\" or \"Can you help me find these products?\" "
+        "is allowed when it fits, but do not force one. "
         "Do not start with a generic phrase like \"I need a few different items\" unless it is "
         "required by the opener above. Do not mention product prices. Return only the JSON object."
     )
