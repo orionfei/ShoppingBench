@@ -123,10 +123,18 @@ def resolve_project_path(path: str | Path) -> Path:
     return path if path.is_absolute() else PROJECT_ROOT / path
 
 
-def tool_schema_text(exclude_tools: list[str] | set[str] | tuple[str, ...] | None = None) -> str:
+def tool_schema_text(
+    exclude_tools: list[str] | set[str] | tuple[str, ...] | None = None,
+    include_tools: list[str] | set[str] | tuple[str, ...] | None = None,
+) -> str:
     excluded = set(exclude_tools or [])
+    included = set(include_tools or [])
     lines = []
-    enabled_tools = [tool for tool in TOOL_SPECS if tool["name"] not in excluded]
+    enabled_tools = [
+        tool
+        for tool in TOOL_SPECS
+        if tool["name"] not in excluded and (not included or tool["name"] in included)
+    ]
     for idx, tool in enumerate(enabled_tools, 1):
         lines.append(f"{idx}. Name: {tool['name']}")
         lines.append(f"Description: {tool['description']}")
@@ -138,6 +146,10 @@ def tool_schema_text(exclude_tools: list[str] | set[str] | tuple[str, ...] | Non
 def build_system_prompt(
     prompt_file: str | Path,
     exclude_tools: list[str] | set[str] | tuple[str, ...] | None = None,
+    include_tools: list[str] | set[str] | tuple[str, ...] | None = None,
 ) -> str:
     prompt = resolve_project_path(prompt_file).read_text(encoding="utf-8").strip()
-    return prompt.replace("<|toolkit_description|>", tool_schema_text(exclude_tools))
+    return prompt.replace(
+        "<|toolkit_description|>",
+        tool_schema_text(exclude_tools=exclude_tools, include_tools=include_tools),
+    )

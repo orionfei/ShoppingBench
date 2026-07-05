@@ -2,30 +2,46 @@ import os
 import sys
 import time
 import copy
+import hashlib
 import portalocker
 import multiprocessing as mp
 import asyncio
 import ujson as json
+from pathlib import Path
 from tqdm import tqdm
 
 from toolkit import tools, toolmap
 from util.llm import ask_llm
 from util.message import Message, USER_ROLES, ASSISTANT_ROLES
-from util.history_compression import build_state_folded_user_prompt
+from util.harness_fsm import (
+    build_harness_snapshot,
+    build_harness_user_prompt,
+    search_trace_markdown,
+)
 from util.system_prompt import build_system_prompt
 
 
 MAX_STEPS = 30
 
 
-def get_system_prompt(config: dict) -> str:
+def get_system_prompt(config: dict, harness_snapshot=None) -> str:
+    if harness_snapshot is not None:
+        return build_system_prompt(
+            harness_snapshot.prompt_file,
+            include_tools=harness_snapshot.include_tools,
+        )
     return build_system_prompt(
         config["system_prompt_file"],
         exclude_tools=config.get("exclude_tools", []),
     )
 
 
-def get_user_prompt(message: Message, history_messages: list[str], config: dict | None = None) -> str:
+def get_user_prompt(
+    message: Message,
+    history_messages: list[str],
+    config: dict | None = None,
+    harness_snapshot=None,
+) -> str:
     user_message = message.to_string(USER_ROLES)
     if user_message:
         history_messages.append(user_message)
@@ -36,18 +52,33 @@ def get_user_prompt(message: Message, history_messages: list[str], config: dict 
 
     config = config or {}
     if config.get("history_compression") == "state_folded":
-        return build_state_folded_user_prompt(
-            history_messages,
-            max_candidates_per_search=config.get("state_max_candidates_per_search", 10),
-            max_searches=config.get("state_max_searches"),
-            max_budget_candidates=config.get("state_max_budget_candidates"),
-            max_viewed_products=config.get("state_max_viewed_products"),
-            never_expand=config.get("state_never_expand", False),
-            min_char_saving_for_state=config.get("state_min_char_saving", 0.0),
-        )
+        if harness_snapshot is None:
+            harness_snapshot = build_harness_snapshot(
+                history_messages,
+                prompt_files=config.get("harness_prompt_files"),
+            )
+        return build_harness_user_prompt(harness_snapshot, history_messages)
 
     history = "\n\n".join(history_messages)
     return f"# Dialogue Records History\n{history}"
+
+
+def write_search_trace(query: str, harness_snapshot, config: dict) -> str | None:
+    if config.get("history_compression") != "state_folded":
+        return None
+    trace_dir = config.get("harness_search_trace_dir")
+    if not trace_dir:
+        rollout_file = config.get("rollout_file", "rollout.jsonl")
+        trace_dir = str(Path(rollout_file).with_suffix("")) + "_search_trace"
+    path = Path(trace_dir)
+    path.mkdir(parents=True, exist_ok=True)
+    query_hash = hashlib.md5(query.encode("utf-8")).hexdigest()[:12]
+    trace_path = path / f"{query_hash}.md"
+    trace_path.write_text(
+        search_trace_markdown(query, harness_snapshot.search_trace),
+        encoding="utf-8",
+    )
+    return str(trace_path)
 
 
 def think(
@@ -98,10 +129,29 @@ def react_loop(query: str, config: dict):
     corpus_tracker = []
     history_messages = []
     message = Message(user=query)
-    system_prompt = get_system_prompt(config)
     #print(f"System Prompt:\n{system_prompt}")
     for step in range(1, MAX_STEPS + 1):
-        user_prompt = get_user_prompt(message, history_messages, config)
+        harness_snapshot = None
+        if config.get("history_compression") == "state_folded":
+            user_message = message.to_string(USER_ROLES)
+            if user_message:
+                history_messages.append(user_message)
+
+            assistant_message = message.to_string(ASSISTANT_ROLES)
+            if assistant_message:
+                history_messages.append(assistant_message)
+
+            harness_snapshot = build_harness_snapshot(
+                history_messages,
+                prompt_files=config.get("harness_prompt_files"),
+            )
+            user_prompt = build_harness_user_prompt(harness_snapshot, history_messages)
+            system_prompt = get_system_prompt(config, harness_snapshot)
+            search_trace_file = write_search_trace(query, harness_snapshot, config)
+        else:
+            user_prompt = get_user_prompt(message, history_messages, config)
+            system_prompt = get_system_prompt(config)
+            search_trace_file = None
         message.clear()
         reasoning_content, content, message = think(
             system_prompt=system_prompt,
@@ -129,6 +179,8 @@ def react_loop(query: str, config: dict):
                     "query": query,
                     "timestamp": int(time.time() * 1000),
                     "history_compression": config.get("history_compression", "raw"),
+                    "harness_state": harness_snapshot.state_name if harness_snapshot else None,
+                    "harness_search_trace_file": search_trace_file,
                 },
             }
         )

@@ -824,30 +824,7 @@ def build_state_folded_user_prompt(
     never_expand: bool = False,
     min_char_saving_for_state: float = 0.0,
 ) -> str:
-    query = _first_user_message(history_messages)
-    raw_prompt = "# Dialogue Records History\n" + "\n\n".join(history_messages)
-    parts = [f"<user>{query}</user>"]
-    has_assistant_history = any("<tool_call>" in item or "<response>" in item for item in history_messages)
-    if has_assistant_history:
-        state = build_state_from_history(
-            history_messages,
-            max_candidates_per_search,
-            max_searches=max_searches,
-            max_budget_candidates=max_budget_candidates,
-            max_viewed_products=max_viewed_products,
-        )
-        parts.append(
-            "<state>"
-            + json.dumps(state, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-            + "</state>"
-        )
-    folded_prompt = "# Dialogue Records History\n" + "\n\n".join(parts)
-    if never_expand:
-        try:
-            min_char_saving_for_state = float(min_char_saving_for_state)
-        except Exception:
-            min_char_saving_for_state = 0.0
-        max_folded_chars = len(raw_prompt) * max(0.0, 1.0 - min_char_saving_for_state)
-        if len(folded_prompt) > max_folded_chars:
-            return raw_prompt
-    return folded_prompt
+    from util.harness_fsm import build_harness_snapshot, build_harness_user_prompt
+
+    snapshot = build_harness_snapshot(history_messages)
+    return build_harness_user_prompt(snapshot, history_messages)
