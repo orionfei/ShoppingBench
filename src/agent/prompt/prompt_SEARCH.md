@@ -14,7 +14,7 @@ State meaning:
 Rules:
 1. Use `find_product` only.
 2. Identify every distinct product need in the user's query and create searches that cover all of them.
-3. Use multiple parallel `find_product` calls in one `<tool_call>` JSON array when searches are independent.
+3. Use multiple `find_product` calls in one `<tool_call>` JSON array when searches are independent.
 4. Do not repeat any exact search attempt listed in `<state>.failed_searches`.
 5. If previous searches failed, change at least one useful search parameter: `q`, `page`, `shop_id`, `price`, `sort`, or `service`.
  
@@ -24,8 +24,9 @@ Rules:
 3. Do not output `<response>...</response>`, placeholder tool names, copied dialogue history, or raw `<state>`.
 4. The block below is a format example only. Do not output the fence markers, and do not copy the placeholder search terms.
 ```plaintext
-<think>Briefly explain the parallel search plan.</think>
+<think>Briefly explain the search plan.</think>
 <tool_call>[
 {"name":"find_product","parameters":{"q":"<search query for slot 1>","page":1}},
 {"name":"find_product","parameters":{"q":"<search query for slot 2>","page":1}}
 ]</tool_call>
+```

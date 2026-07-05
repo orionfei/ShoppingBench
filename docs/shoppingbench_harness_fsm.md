@@ -103,7 +103,7 @@ view_product_information + python_execute
 
 These actions can run in the same turn because `python_execute` uses selected product ids,
 shop ids, and prices from the candidate pool, while voucher/budget rules remain in the
-user query. It does not depend on the `view_product_information` observation.
+user query. It must not depend on the same-turn `view_product_information` observation.
 
 The state should contain only the information needed for current candidate
 selection. It should not duplicate the user query, parsed voucher rules, search
@@ -119,13 +119,36 @@ agent to interpret when it writes the budget calculation.
       "shop_id": "...",
       "title": "...",
       "price": 123,
-      "service": []
+      "service": [],
+      "sold_count": 100
     }
   ]
 }
 ```
 
-`candidate_pool` is a flat list in the first version:
+`candidate_pool` is a flat list in the first version. It is built from all
+non-empty `find_product` observations in the current selection window, not only
+from the latest search batch. After a non-empty retry from `DECISION`, the pool
+also carries forward the previously selected products so a multi-item task can
+keep valid products and replace only failed products.
+
+`previous_decision` is present only after `DECISION` found non-empty retry
+results. It carries compact observation-derived evidence from the previous
+checked selection so the agent can avoid repeating the same failed selection
+while still keeping products that appear valid.
+
+```json
+{
+  "candidate_pool": [],
+  "previous_decision": {
+    "selected_products": [],
+    "viewed_products": [],
+    "budget_calculation": {}
+  }
+}
+```
+
+Example:
 
 ```json
 {
@@ -135,7 +158,8 @@ agent to interpret when it writes the budget calculation.
       "shop_id": "s88",
       "title": "Black wireless earbuds with charging case",
       "price": 180,
-      "service": ["freeShipping"]
+      "service": ["freeShipping"],
+      "sold_count": 20
     }
   ]
 }
@@ -195,17 +219,23 @@ failure reason.
       "shop_id": "...",
       "title": "...",
       "price": 123,
-      "service": []
+      "service": [],
+      "sold_count": 100
     }
   ],
+  "selected_shop_ids": ["..."],
+  "view_requested_product_ids": ["..."],
   "viewed_products": [
     {
       "product_id": "...",
+      "title": "...",
+      "description": "...",
       "sku_options": {},
       "attributes": {},
       "service": []
     }
   ],
+  "budget_product_ids": ["..."],
   "budget_calculation": {
     "product_ids": ["..."],
     "shop_ids": ["..."],
@@ -215,8 +245,11 @@ failure reason.
     "voucher_used": true,
     "payable_total": 250,
     "budget": 260,
-    "within_budget": true
+    "within_budget": true,
+    "_tool_success": true,
+    "_parse_ok": true
   },
+  "selection_consistency": true,
   "failed_retry_searches": []
 }
 ```
@@ -229,13 +262,33 @@ and service.
 whether selected products match the user's requested attributes, SKU options,
 model, color, size, material, service requirements, and similar constraints.
 
-`budget_calculation` comes from the budget calculation step. It should be
-structured enough to decide voucher scope, threshold, payable total, and final
-budget status.
+`view_requested_product_ids` comes from the `view_product_information`
+parameters. `budget_product_ids` comes from the structured `python_execute`
+output. The harness only enters `DECISION` when the budget output includes
+product ids and those ids are consistent with the viewed ids. Product id order
+does not need to match between the detail check and budget calculation.
+Multiple valid `view_product_information` calls in the same selection window are
+merged before this consistency check.
 
-`failed_retry_searches` records only replacement searches from `DECISION` whose
-results were empty. Use sparse `find_product` parameter records, with the same
-allowed keys as `CANDIDATE_SEARCH.failed_searches`:
+`budget_calculation` comes from the `python_execute` observation. The harness
+parses the tool output if it is JSON, but it does not parse voucher or budget
+rules from the user query. `_tool_success` and `_parse_ok` record whether the
+tool result was usable as structured evidence.
+
+To enter `DECISION`, the parsed budget calculation must include usable
+`product_ids`, `shop_ids`, `total_before_voucher`, `payable_total`, `budget`,
+`within_budget`, and `voucher_used`. The `shop_ids` length must match
+`product_ids`, and the viewed product ids must all be present in the detail
+observation.
+
+`selection_consistency` records that the viewed product ids and budget product
+ids are consistent for this decision state.
+
+`failed_retry_searches` records empty `find_product` attempts that should not
+be repeated while searching for replacements. This includes empty cold-start
+searches carried forward into `DECISION` and empty retry searches from
+`DECISION`. Use sparse `find_product` parameter records, with the same allowed
+keys as `CANDIDATE_SEARCH.failed_searches`:
 
 ```text
 q, page, shop_id, price, sort, service
@@ -252,7 +305,8 @@ search parameters to `failed_retry_searches`.
 CANDIDATE_SEARCH -- find_product nonempty --> CANDIDATE_SELECT
 CANDIDATE_SEARCH -- find_product empty --> CANDIDATE_SEARCH
 
-CANDIDATE_SELECT -- view_product_information + python_execute --> DECISION
+CANDIDATE_SELECT -- valid view_product_information + valid python_execute with consistent ids --> DECISION
+CANDIDATE_SELECT -- partial/invalid check --> CANDIDATE_SELECT
 
 DECISION -- recommend_product + terminate --> DONE
 DECISION -- find_product retry nonempty / shop_id refine nonempty --> CANDIDATE_SELECT
@@ -268,7 +322,8 @@ stateDiagram-v2
     CANDIDATE_SEARCH --> CANDIDATE_SELECT: find_product nonempty\nbuild candidate_pool
     CANDIDATE_SEARCH --> CANDIDATE_SEARCH: find_product empty\nrecord failed query
 
-    CANDIDATE_SELECT --> DECISION: view_product_information + python_execute
+    CANDIDATE_SELECT --> DECISION: valid view_product_information + valid python_execute\nconsistent ids
+    CANDIDATE_SELECT --> CANDIDATE_SELECT: partial or invalid check
 
     DECISION --> [*]: recommend_product + terminate
     DECISION --> CANDIDATE_SELECT: find_product retry nonempty\nor shop_id refine nonempty
@@ -293,6 +348,12 @@ DECISION:
 - State names describe what information the model has at the start of the turn.
 - The harness decides the current state from previous tool calls and observations.
 - The model does not declare the state.
+- State tool sets are enforced by the harness. A tool call outside the current
+  state's tool set is returned as a structured error observation and is not
+  executed.
+- In `DECISION`, `terminate` is only executed when it appears with
+  `recommend_product`. Lone `terminate` and mixed search/terminal actions are
+  rejected as structured error observations.
 - The `<state>` block contains only information directly available from tool
   observations and needed for the current state decision. Structured data that
   would require parsing the user query, such as voucher rules, is not added to
@@ -303,6 +364,7 @@ DECISION:
   to avoid repeating empty searches.
 - `CANDIDATE_SEARCH` is cold-start only. Once the agent has entered `CANDIDATE_SELECT`,
   it should not return to `CANDIDATE_SEARCH`; later retry searches happen inside `DECISION`.
-- `find_product` calls in one turn are executed in parallel up to `max_parallel_calls`.
+- Multiple `find_product` calls can be placed in one turn; runtimes may execute
+  them in parallel up to `max_parallel_calls`.
 - `recommend_product` and `terminate` can be in the same turn because `terminate` does not
   depend on the observation from `recommend_product`.

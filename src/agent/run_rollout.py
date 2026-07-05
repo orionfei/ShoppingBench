@@ -101,9 +101,56 @@ def think(
     return reasoning_content, content, Message.from_string(reasoning_content, content)
 
 
-def act(message: Message) -> list[dict]:
+def act(message: Message, allowed_tools: set[str] | None = None) -> list[dict]:
     obs = []
+    tool_names = {commend["name"] for commend in message.tool_call}
+    mixed_decision_actions = (
+        allowed_tools is not None
+        and {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools)
+        and "find_product" in tool_names
+        and bool({"recommend_product", "terminate"} & tool_names)
+    )
+    lone_decision_terminate = (
+        allowed_tools is not None
+        and {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools)
+        and "terminate" in tool_names
+        and "recommend_product" not in tool_names
+    )
     for commend in message.tool_call:
+        if mixed_decision_actions:
+            obs.append(
+                {
+                    "tool_call_id": commend["tool_call_id"],
+                    "results": {
+                        "error": "mixed_decision_actions_not_allowed",
+                        "tool": commend["name"],
+                    },
+                }
+            )
+            continue
+        if lone_decision_terminate and commend["name"] == "terminate":
+            obs.append(
+                {
+                    "tool_call_id": commend["tool_call_id"],
+                    "results": {
+                        "error": "terminate_requires_recommend_product_in_decision",
+                        "tool": commend["name"],
+                    },
+                }
+            )
+            continue
+        if allowed_tools is not None and commend["name"] not in allowed_tools:
+            obs.append(
+                {
+                    "tool_call_id": commend["tool_call_id"],
+                    "results": {
+                        "error": "tool_not_allowed_in_current_state",
+                        "tool": commend["name"],
+                        "allowed_tools": sorted(allowed_tools),
+                    },
+                }
+            )
+            continue
         if commend["name"] not in toolmap:
             continue
         tool = toolmap[commend["name"]]
@@ -116,8 +163,30 @@ def act(message: Message) -> list[dict]:
     return obs
 
 
-def is_terminate(message: Message, config: dict | None = None) -> bool:
-    tool_names = {commend["name"] for commend in message.tool_call}
+def is_terminate(
+    message: Message,
+    config: dict | None = None,
+    allowed_tools: set[str] | None = None,
+) -> bool:
+    tool_names = {
+        commend["name"]
+        for commend in message.tool_call
+        if allowed_tools is None or commend["name"] in allowed_tools
+    }
+    if (
+        allowed_tools is not None
+        and {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools)
+        and "find_product" in tool_names
+        and bool({"recommend_product", "terminate"} & tool_names)
+    ):
+        return False
+    if (
+        allowed_tools is not None
+        and {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools)
+        and "terminate" in tool_names
+        and "recommend_product" not in tool_names
+    ):
+        return False
     if (config or {}).get("stop_after_recommend") and "recommend_product" in tool_names:
         return True
     if (not message.think and not message.tool_call and not message.response) or "terminate" in tool_names:
@@ -161,7 +230,10 @@ def react_loop(query: str, config: dict):
             api_key=config.get("api_key", ""),
         )
         if message.tool_call:
-            message.obs = act(message)
+            message.obs = act(
+                message,
+                allowed_tools=harness_snapshot.include_tools if harness_snapshot else None,
+            )
 
         corpus_tracker.append(
             {
@@ -185,7 +257,11 @@ def react_loop(query: str, config: dict):
             }
         )
         #print(f"{'*' * 20}Setps: {step}/{MAX_STEPS}{'*' * 20}\nReasoning Content: {reasoning_content}\nContent: {content}\nMessage: {json.dumps(message.to_dict(), indent=4)}\n")
-        if is_terminate(message, config):
+        if is_terminate(
+            message,
+            config,
+            allowed_tools=harness_snapshot.include_tools if harness_snapshot else None,
+        ):
             break
 
     with open(config["rollout_file"], "a") as fout:

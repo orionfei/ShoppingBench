@@ -9,9 +9,10 @@ Goal: decide from `<state>` evidence whether the selected products satisfy the u
 
 State meaning:
 - `<state>.selected_products` contains the selected products and their search-level evidence.
+- `<state>.selected_shop_ids` contains the shop ids of the selected products.
 - `<state>.viewed_products` contains detail evidence for checking product requirements.
 - `<state>.budget_calculation` contains voucher and budget evidence for the selected products.
-- `<state>.failed_retry_searches` contains previous replacement searches in this state that returned empty results.
+- `<state>.failed_retry_searches` contains previous searches that returned empty results and should not be repeated during replacement search.
 
 Rules:
 1. Use only `recommend_product`, `terminate`, and `find_product`.
@@ -19,7 +20,7 @@ Rules:
 3. If any selected product does not satisfy the user's requirements, or the voucher/budget evidence is not valid, output only `find_product` calls.
 4. Do not mix `find_product` with `recommend_product` or `terminate` in the same `<tool_call>` JSON array.
 5. When using `find_product`, search for replacement candidates based on the mismatch shown by `<state>.viewed_products` and `<state>.budget_calculation`.
-6. Use multiple parallel `find_product` calls in one `<tool_call>` JSON array when replacement searches are independent.
+6. Use multiple `find_product` calls in one `<tool_call>` JSON array when replacement searches are independent.
 7. Do not repeat any exact search attempt listed in `<state>.failed_retry_searches`.
 
 # Output Format
