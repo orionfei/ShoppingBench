@@ -17,6 +17,70 @@ CANDIDATE_SELECT
 DECISION
 ```
 
+## State Determination Algorithm
+
+The model never declares the current state. At the start of every assistant
+turn, the harness rebuilds the state from the structured history of previous
+tool calls and tool observations.
+
+The input to the state builder is the folded dialogue history:
+
+```text
+<user>...</user>
+<tool_call>...</tool_call>
+<obs>...</obs>
+```
+
+The harness parses each assistant/tool turn into records:
+
+```json
+{
+  "name": "tool_name",
+  "parameters": {},
+  "results": {}
+}
+```
+
+Only structured `tool_call` parameters and `obs.results` are used to determine
+the state. The harness does not infer state from the user's natural-language
+intent, and it does not parse voucher or budget rules from the user query into
+`<state>`.
+
+The state builder follows this order:
+
+1. If there are no previous tool turns, return `CANDIDATE_SEARCH` with an empty
+   state.
+2. Scan all previous turns for valid SELECT checks. A valid SELECT check is a
+   structurally valid `view_product_information` plus a structurally valid
+   `python_execute` budget calculation for the same selected product ids.
+3. If no valid SELECT check exists:
+   - If no non-empty `find_product` result has ever been observed, return
+     `CANDIDATE_SEARCH`.
+   - If any non-empty `find_product` result has been observed, return
+     `CANDIDATE_SELECT`.
+4. If at least one valid SELECT check exists, use the latest valid check as the
+   current verified selection.
+5. Inspect only `find_product` calls after that latest valid check:
+   - If there is no non-empty retry result, return `DECISION`.
+   - If there is a non-empty retry result, return `CANDIDATE_SELECT` with a new
+     candidate pool built from the previous selected products plus the retry
+     results.
+
+This means `CANDIDATE_SEARCH` is only the cold-start search state. Once the
+harness has observed a non-empty search result, later replacement searches occur
+inside `DECISION`; the harness does not return to cold-start
+`CANDIDATE_SEARCH`.
+
+Only a real empty search result is treated as a failed search:
+
+```text
+results == []
+```
+
+Malformed observations, `None`, and error dictionaries such as
+`{"error": "..."}` are not treated as empty searches and are not added to
+`failed_searches` or `failed_retry_searches`.
+
 ### CANDIDATE_SEARCH
 
 Meaning:
@@ -173,6 +237,59 @@ If later rollouts show that multi-item requests are hard to resolve from titles
 alone, the schema can be extended to grouped candidates outside this first
 contract.
 
+### Valid SELECT Check
+
+A valid SELECT check is the only way to move from `CANDIDATE_SELECT` to
+`DECISION`. It is also the evidence base that `DECISION` uses to decide whether
+to recommend or search again.
+
+The check may happen in one assistant turn:
+
+```text
+view_product_information + python_execute
+```
+
+or across multiple `CANDIDATE_SELECT` turns, as long as the latest accumulated
+valid view evidence and the budget calculation refer to the same selected
+product ids.
+
+The harness accepts a SELECT check only if all of the following are true:
+
+1. `view_product_information` was called with non-empty `product_ids`.
+2. The view observation is a list.
+3. Every requested product id appears in the view observation.
+4. `python_execute` returned a tool result with usable text in `stdout` or
+   `observation`.
+5. That text parses as a JSON object.
+6. The parsed JSON includes:
+   - `product_ids`
+   - `shop_ids`
+   - `total_before_voucher`
+   - `payable_total`
+   - `budget`
+   - `within_budget`
+   - `voucher_used`
+7. `shop_ids` is a list with the same length as `product_ids`.
+8. `within_budget` and `voucher_used` are booleans.
+9. `total_before_voucher`, `payable_total`, and `budget` are numeric.
+10. Product ids are not repeated. Quantity is not represented by duplicate ids
+    in this schema.
+11. The viewed product ids and budget product ids are the same set. Product id
+    order does not matter.
+12. Every selected product id comes from the active `candidate_pool`.
+13. Every reported `shop_id` matches the observed `shop_id` for that product.
+14. `total_before_voucher` matches the sum of observed candidate prices.
+15. `within_budget` matches `payable_total <= budget`.
+
+The harness intentionally does not recompute voucher eligibility from the user
+query. Voucher scope, thresholds, discount formulas, and budget semantics remain
+in the raw user query and must be interpreted by the agent when it writes and
+later evaluates the budget calculation.
+
+If any condition above fails, the harness stays in `CANDIDATE_SELECT` and
+rebuilds the same current candidate-selection state instead of entering
+`DECISION`.
+
 ### DECISION
 
 Meaning:
@@ -324,6 +441,22 @@ DECISION -- find_product retry nonempty / shop_id refine nonempty --> CANDIDATE_
 DECISION -- find_product retry empty --> DECISION
 ```
 
+More explicitly:
+
+- Initial turn always starts in `CANDIDATE_SEARCH`.
+- `CANDIDATE_SEARCH -> CANDIDATE_SEARCH` happens only when every observed
+  `find_product` result so far is an empty list.
+- `CANDIDATE_SEARCH -> CANDIDATE_SELECT` happens as soon as at least one
+  non-empty `find_product` result is observed.
+- `CANDIDATE_SELECT -> CANDIDATE_SELECT` happens when no valid SELECT check has
+  been observed yet.
+- `CANDIDATE_SELECT -> DECISION` happens when a valid SELECT check is observed.
+- `DECISION -> DECISION` happens when there is a latest valid SELECT check and
+  no later non-empty retry search exists. Empty retry searches are recorded in
+  `failed_retry_searches`.
+- `DECISION -> CANDIDATE_SELECT` happens when a `find_product` call after the
+  latest valid SELECT check returns non-empty results.
+
 ## State Diagram
 
 ```mermaid
@@ -353,6 +486,35 @@ CANDIDATE_SELECT:
 DECISION:
   include_tools = {find_product, recommend_product, terminate}
 ```
+
+## Runtime Protocol Enforcement
+
+State prompts tell the model what to do, but the runtime also enforces the FSM
+contract. Invalid calls are returned as structured error observations and are
+not executed.
+
+The runtime rejects:
+
+- Any tool outside the current state's tool set.
+- A `find_product` call that exactly repeats a sparse parameter record in
+  `failed_searches` or `failed_retry_searches`.
+- In `DECISION`, mixing `find_product` with `recommend_product` or `terminate`
+  in the same action array.
+- In `DECISION`, lone `recommend_product`.
+- In `DECISION`, lone `terminate`.
+- Multiple `<tool_call>` blocks in one assistant output. Multiple calls must be
+  placed inside a single JSON array in one `<tool_call>` block.
+- In VERL rollout, calls beyond `max_parallel_calls`; those extra calls receive
+  structured `too_many_parallel_calls` errors instead of being silently dropped.
+
+The successful terminal action is therefore:
+
+```text
+recommend_product + terminate
+```
+
+in one `<tool_call>` JSON array. `terminate` does not depend on the observation
+from `recommend_product`, so they can run in the same turn.
 
 ## Notes
 
