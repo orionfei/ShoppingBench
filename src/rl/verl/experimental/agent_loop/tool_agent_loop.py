@@ -33,12 +33,21 @@ AGENT_SRC = Path(__file__).resolve().parents[4] / "agent"
 if str(AGENT_SRC) not in sys.path:
     sys.path.insert(0, str(AGENT_SRC))
 
-from util.history_compression import build_state_folded_user_prompt  # noqa: E402
+from util.harness_fsm import (  # noqa: E402
+    build_harness_snapshot,
+    build_harness_user_prompt_with_brief_instructions,
+    is_repeated_failed_search,
+)
 from util.message import ASSISTANT_ROLES, USER_ROLES, Message, generate_tool_call_id  # noqa: E402
 from util.system_prompt import build_system_prompt  # noqa: E402
 
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
+
+FSM_SYSTEM_PROMPT = (
+    "You are a ShoppingBench agent. Follow the current harness state instructions "
+    "in the user message exactly."
+)
 
 
 class FunctionCall(BaseModel):
@@ -184,18 +193,11 @@ class ToolAgentLoop(AgentLoopBase):
     async def run(self, messages: list[dict[str, Any]], sampling_params: dict[str, Any]) -> AgentLoopOutput:
         metrics = {}
         request_id = uuid4().hex
-        system_message = self._system_message(messages)
+        system_message = {"role": "system", "content": FSM_SYSTEM_PROMPT}
         query = self._initial_user_query(messages)
         history_messages = [Message(user=query).to_string(USER_ROLES)]
-        user_prompt = build_state_folded_user_prompt(
-            history_messages,
-            self.state_max_candidates_per_search,
-            max_searches=self.state_max_searches,
-            max_budget_candidates=self.state_max_budget_candidates,
-            max_viewed_products=self.state_max_viewed_products,
-            never_expand=self.state_never_expand,
-            min_char_saving_for_state=self.state_min_char_saving,
-        )
+        active_snapshot = build_harness_snapshot(history_messages)
+        user_prompt = build_harness_user_prompt_with_brief_instructions(active_snapshot, history_messages)
         current_messages = [system_message, {"role": "user", "content": user_prompt}]
         prompt_ids = await self.loop.run_in_executor(
             None,
@@ -234,7 +236,8 @@ class ToolAgentLoop(AgentLoopBase):
                 rollout_messages.append(assistant_record)
                 break
 
-            normalized_calls = self._normalize_tool_calls(tool_calls[: self.max_parallel_calls])
+            normalized_calls = self._normalize_tool_calls(tool_calls)
+            tool_block_error = self._tool_block_validation_error(assistant_text)
             assistant_record["tool_calls"] = [
                 {"name": item["name"], "parameters": item["parameters"]} for item in normalized_calls
             ]
@@ -242,12 +245,36 @@ class ToolAgentLoop(AgentLoopBase):
 
             # call tools
             tasks = []
-            for tool_call in normalized_calls:
+            task_indices = []
+            tool_responses: list[dict[str, Any] | None] = [None] * len(normalized_calls)
+            for idx, tool_call in enumerate(normalized_calls):
+                validation_error = tool_block_error
+                if validation_error is None and self.max_parallel_calls and idx >= self.max_parallel_calls:
+                    validation_error = {
+                        "error": "too_many_parallel_calls",
+                        "tool": tool_call["name"],
+                        "max_parallel_calls": self.max_parallel_calls,
+                    }
+                if validation_error is None:
+                    validation_error = self._tool_validation_error(
+                        tool_call,
+                        normalized_calls,
+                        active_snapshot,
+                    )
+                if validation_error:
+                    tool_responses[idx] = self._tool_error_response(tool_call, validation_error)
+                    continue
+                task_indices.append(idx)
                 tasks.append(self._call_tool(tool_call))
             with simple_timer("tool_calls", metrics):
-                tool_responses = await asyncio.gather(*tasks)
+                executed_responses = await asyncio.gather(*tasks) if tasks else []
             if any(isinstance(item, Exception) for item in tool_responses):
                 break
+            for idx, item in zip(task_indices, executed_responses, strict=False):
+                tool_responses[idx] = item
+            if any(item is None or isinstance(item, Exception) for item in tool_responses):
+                break
+            tool_responses = [item for item in tool_responses if item is not None]
 
             history_messages.append(
                 self._assistant_history_message(
@@ -259,18 +286,14 @@ class ToolAgentLoop(AgentLoopBase):
             for item in tool_responses:
                 rollout_messages.append({"role": "user", "content": f"<obs>{item['tool_response']}</obs>"})
 
-            if any(item["name"] == "terminate" for item in normalized_calls):
+            if any(
+                item["name"] == "terminate" and not self._is_error_result(item.get("result"))
+                for item in tool_responses
+            ):
                 break
 
-            next_user_prompt = build_state_folded_user_prompt(
-                history_messages,
-                self.state_max_candidates_per_search,
-                max_searches=self.state_max_searches,
-                max_budget_candidates=self.state_max_budget_candidates,
-                max_viewed_products=self.state_max_viewed_products,
-                never_expand=self.state_never_expand,
-                min_char_saving_for_state=self.state_min_char_saving,
-            )
+            active_snapshot = build_harness_snapshot(history_messages)
+            next_user_prompt = build_harness_user_prompt_with_brief_instructions(active_snapshot, history_messages)
             state_prompt_ids = await self.loop.run_in_executor(
                 None,
                 lambda: self.tokenizer.apply_chat_template(
@@ -387,6 +410,70 @@ class ToolAgentLoop(AgentLoopBase):
             response=self._extract_role_text(assistant_text, "response"),
         )
         return message.to_string(ASSISTANT_ROLES)
+
+    @staticmethod
+    def _is_decision_tool_set(allowed_tools: set[str]) -> bool:
+        return {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools)
+
+    @staticmethod
+    def _tool_block_validation_error(text: str) -> dict[str, Any] | None:
+        if text.count("<tool_call>") == text.count("</tool_call>") == 1:
+            return None
+        return {"error": "exactly_one_tool_call_block_required"}
+
+    @classmethod
+    def _tool_validation_error(
+        cls,
+        tool_call: dict[str, Any],
+        all_calls: list[dict[str, Any]],
+        snapshot,
+    ) -> dict[str, Any] | None:
+        allowed_tools = snapshot.include_tools
+        tool_names = {call["name"] for call in all_calls}
+        if cls._is_decision_tool_set(allowed_tools):
+            if "find_product" in tool_names and bool({"recommend_product", "terminate"} & tool_names):
+                return {
+                    "error": "mixed_decision_actions_not_allowed",
+                    "tool": tool_call["name"],
+                }
+            if "terminate" in tool_names and "recommend_product" not in tool_names:
+                if tool_call["name"] == "terminate":
+                    return {
+                        "error": "terminate_requires_recommend_product_in_decision",
+                        "tool": tool_call["name"],
+                    }
+            if "recommend_product" in tool_names and "terminate" not in tool_names:
+                if tool_call["name"] == "recommend_product":
+                    return {
+                        "error": "recommend_product_requires_terminate_in_decision",
+                        "tool": tool_call["name"],
+                    }
+        if tool_call["name"] not in allowed_tools:
+            return {
+                "error": "tool_not_allowed_in_current_state",
+                "tool": tool_call["name"],
+                "allowed_tools": sorted(allowed_tools),
+            }
+        if tool_call["name"] == "find_product" and is_repeated_failed_search(tool_call.get("parameters", {}), snapshot):
+            return {
+                "error": "repeated_failed_search_not_allowed",
+                "tool": tool_call["name"],
+            }
+        return None
+
+    @staticmethod
+    def _tool_error_response(tool_call: dict[str, Any], error: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "tool_call_id": tool_call["tool_call_id"],
+            "name": tool_call["name"],
+            "parameters": tool_call["parameters"],
+            "tool_response": json.dumps(error, ensure_ascii=False),
+            "result": error,
+        }
+
+    @staticmethod
+    def _is_error_result(result) -> bool:
+        return isinstance(result, dict) and "error" in result
 
     async def _call_tool(self, tool_call: dict[str, Any]) -> dict[str, Any]:
         """Call tool and return tool response."""

@@ -58,7 +58,11 @@ def _has_valid_format(text: str) -> bool:
     has_response = "<response>" in text
     if has_tool and text.count("<tool_call>") != text.count("</tool_call>"):
         return False
+    if has_tool and text.count("<tool_call>") != 1:
+        return False
     if has_response and text.count("<response>") != text.count("</response>"):
+        return False
+    if has_response and text.count("<response>") != 1:
         return False
     return has_tool or has_response
 
@@ -314,42 +318,60 @@ def _tool_calls_from_message(message: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _workflow_validity(messages: list[dict[str, Any]]) -> float:
+    phase = "SEARCH"
     saw_find = False
-    saw_view = False
-    saw_budget = False
-    saw_recommend = False
-    saw_terminate = False
+    pending_view = False
 
     for message in messages:
         if message.get("role") != "assistant" and message.get("tool_calls") is None and message.get("tool_call") is None:
             continue
         calls = _tool_calls_from_message(message)
-        if len(calls) > 1 and not all(call.get("name") == "find_product" for call in calls):
+        if not calls:
+            continue
+        names = [call.get("name") for call in calls]
+        tool_names = set(names)
+        if any(name not in LEGAL_TOOLS for name in names):
             return 0.0
-        for call in calls:
-            name = call.get("name")
-            if name not in LEGAL_TOOLS or saw_terminate:
+        if phase == "DONE":
+            return 0.0
+
+        if "find_product" in tool_names and bool({"view_product_information", "python_execute", "recommend_product", "terminate"} & tool_names):
+            return 0.0
+        if "terminate" in tool_names and "recommend_product" not in tool_names:
+            return 0.0
+        if "recommend_product" in tool_names and "terminate" not in tool_names:
+            return 0.0
+        if "recommend_product" in tool_names and bool({"view_product_information", "python_execute"} & tool_names):
+            return 0.0
+
+        if tool_names == {"find_product"}:
+            saw_find = True
+            phase = "SELECT" if phase == "DECISION" else "SEARCH"
+            pending_view = False
+            continue
+
+        if tool_names <= {"view_product_information", "python_execute"}:
+            if not saw_find or phase not in {"SEARCH", "SELECT"}:
                 return 0.0
-            if name == "find_product":
-                if saw_view or saw_budget or saw_recommend:
+            if "view_product_information" in tool_names:
+                pending_view = True
+            if "python_execute" in tool_names:
+                if not pending_view:
                     return 0.0
-                saw_find = True
-            elif name == "view_product_information":
-                if not saw_find or saw_budget or saw_recommend:
-                    return 0.0
-                saw_view = True
-            elif name == "python_execute":
-                if not saw_view or saw_recommend:
-                    return 0.0
-                saw_budget = True
-            elif name == "recommend_product":
-                if not saw_budget:
-                    return 0.0
-                saw_recommend = True
-            elif name == "terminate":
-                if not saw_recommend:
-                    return 0.0
-                saw_terminate = True
+                phase = "DECISION"
+                pending_view = False
+            else:
+                phase = "SELECT"
+            continue
+
+        if tool_names <= {"recommend_product", "terminate"}:
+            if phase != "DECISION" or "recommend_product" not in tool_names:
+                return 0.0
+            if "terminate" in tool_names:
+                phase = "DONE"
+            continue
+
+        return 0.0
     return 1.0
 
 

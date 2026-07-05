@@ -16,8 +16,8 @@ State meaning:
 
 Rules:
 1. Use only `recommend_product`, `terminate`, and `find_product`.
-2. If the selected products satisfy all user requirements and `<state>.budget_calculation.within_budget` is true, output `recommend_product` and `terminate` in the same `<tool_call>` JSON array.
-3. If any selected product does not satisfy the user's requirements, or the voucher/budget evidence is not valid, output only `find_product` calls.
+2. If the selected products satisfy all user requirements, the voucher/budget calculation is correct for the user's query, and `<state>.budget_calculation.within_budget` is true, output `recommend_product` and `terminate` in the same `<tool_call>` JSON array.
+3. If any selected product does not satisfy the user's requirements, or the voucher/budget calculation is invalid or inconsistent with the user's query, output only `find_product` calls.
 4. Do not mix `find_product` with `recommend_product` or `terminate` in the same `<tool_call>` JSON array.
 5. When using `find_product`, search for replacement candidates based on the mismatch shown by `<state>.viewed_products` and `<state>.budget_calculation`.
 6. Use multiple `find_product` calls in one `<tool_call>` JSON array when replacement searches are independent.

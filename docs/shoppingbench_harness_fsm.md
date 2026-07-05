@@ -132,6 +132,10 @@ from the latest search batch. After a non-empty retry from `DECISION`, the pool
 also carries forward the previously selected products so a multi-item task can
 keep valid products and replace only failed products.
 
+In `CANDIDATE_SELECT`, selected product ids must come from the currently exposed
+`candidate_pool`. Earlier search results that are not carried into the current
+pool are not valid choices for the current selection window.
+
 `previous_decision` is present only after `DECISION` found non-empty retry
 results. It carries compact observation-derived evidence from the previous
 checked selection so the agent can avoid repeating the same failed selection
@@ -267,6 +271,8 @@ parameters. `budget_product_ids` comes from the structured `python_execute`
 output. The harness only enters `DECISION` when the budget output includes
 product ids and those ids are consistent with the viewed ids. Product id order
 does not need to match between the detail check and budget calculation.
+Repeated product ids are not accepted; quantity is not represented by duplicate
+ids in this schema.
 Multiple valid `view_product_information` calls in the same selection window are
 merged before this consistency check.
 
@@ -279,7 +285,12 @@ To enter `DECISION`, the parsed budget calculation must include usable
 `product_ids`, `shop_ids`, `total_before_voucher`, `payable_total`, `budget`,
 `within_budget`, and `voucher_used`. The `shop_ids` length must match
 `product_ids`, and the viewed product ids must all be present in the detail
-observation.
+observation. The harness also checks the calculation against structured
+candidate evidence: every selected product id must come from observed
+`candidate_pool` evidence, the reported `shop_ids` must match observed product
+shop ids, `total_before_voucher` must match the sum of observed candidate
+prices, and `within_budget` must match `payable_total <= budget`. The harness
+still does not parse voucher rules from the user query.
 
 `selection_consistency` records that the viewed product ids and budget product
 ids are consistent for this decision state.
@@ -351,9 +362,12 @@ DECISION:
 - State tool sets are enforced by the harness. A tool call outside the current
   state's tool set is returned as a structured error observation and is not
   executed.
-- In `DECISION`, `terminate` is only executed when it appears with
-  `recommend_product`. Lone `terminate` and mixed search/terminal actions are
-  rejected as structured error observations.
+- In `DECISION`, `recommend_product` and `terminate` must appear together.
+  Lone `recommend_product`, lone `terminate`, and mixed search/terminal actions
+  are rejected as structured error observations.
+- A `find_product` call that exactly repeats a sparse parameter record in
+  `failed_searches` or `failed_retry_searches` is rejected as a structured error
+  observation and is not executed.
 - The `<state>` block contains only information directly available from tool
   observations and needed for the current state decision. Structured data that
   would require parsing the user query, such as voucher rules, is not added to
@@ -368,3 +382,6 @@ DECISION:
   them in parallel up to `max_parallel_calls`.
 - `recommend_product` and `terminate` can be in the same turn because `terminate` does not
   depend on the observation from `recommend_product`.
+- A FSM assistant output must contain exactly one `<tool_call>` block. Multiple
+  calls belong inside that single JSON array; multiple `<tool_call>` blocks are
+  treated as invalid format.

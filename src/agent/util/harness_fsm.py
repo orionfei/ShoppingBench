@@ -95,6 +95,18 @@ def _unique_searches(searches: list[dict]) -> list[dict]:
     return result
 
 
+def is_repeated_failed_search(parameters: dict, snapshot: HarnessSnapshot) -> bool:
+    state = snapshot.state if isinstance(snapshot.state, dict) else {}
+    failed_searches = []
+    if snapshot.state_name == STATE_CANDIDATE_SEARCH:
+        failed_searches = state.get("failed_searches") or []
+    elif snapshot.state_name == STATE_DECISION:
+        failed_searches = state.get("failed_retry_searches") or []
+    failed_signatures = {_search_signature(item) for item in failed_searches if isinstance(item, dict)}
+    signature = _search_signature(parameters)
+    return bool(signature and signature in failed_signatures)
+
+
 def _slim_candidate(product: dict) -> dict:
     return {
         key: product[key]
@@ -243,8 +255,51 @@ def _valid_budget_calculation(parsed_budget: dict | None) -> bool:
     return True
 
 
+def _to_float(value):
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+def _budget_matches_candidate_evidence(parsed_budget: dict | None, products_by_id: dict[str, dict]) -> bool:
+    if not _valid_budget_calculation(parsed_budget):
+        return False
+    product_ids = _budget_product_ids(parsed_budget)
+    if len(product_ids) != len(set(product_ids)):
+        return False
+    shop_ids = [str(shop_id) for shop_id in parsed_budget.get("shop_ids", [])]
+    products = []
+    for product_id, shop_id in zip(product_ids, shop_ids, strict=False):
+        product = products_by_id.get(str(product_id))
+        if product is None or product.get("price") is None or product.get("shop_id") is None:
+            return False
+        if str(product["shop_id"]) != shop_id:
+            return False
+        price = _to_float(product.get("price"))
+        if price is None:
+            return False
+        products.append(product)
+    expected_total = round(sum(float(product["price"]) for product in products), 2)
+    reported_total = _to_float(parsed_budget.get("total_before_voucher"))
+    payable_total = _to_float(parsed_budget.get("payable_total"))
+    budget = _to_float(parsed_budget.get("budget"))
+    if reported_total is None or abs(reported_total - expected_total) > 0.01:
+        return False
+    if payable_total is None or budget is None:
+        return False
+    if parsed_budget.get("within_budget") != (payable_total <= budget):
+        return False
+    return True
+
+
 def _ids_consistent(view_ids: list[str], budget_ids: list[str]) -> bool:
-    return bool(budget_ids) and set(view_ids) == set(budget_ids)
+    return (
+        bool(budget_ids)
+        and len(view_ids) == len(set(view_ids))
+        and len(budget_ids) == len(set(budget_ids))
+        and set(view_ids) == set(budget_ids)
+    )
 
 
 def _combined_view_requested_ids(records: list[dict]) -> list[str]:
@@ -359,10 +414,28 @@ def _candidate_pool_from_turns(
     return _candidate_pool_from_records(records, seed_products=seed_products)
 
 
+def _candidate_ids_from_turns(turns: list[dict]) -> set[str]:
+    return {
+        str(candidate.get("product_id"))
+        for candidate in _candidate_pool_from_turns(turns)
+        if candidate.get("product_id") is not None
+    }
+
+
+def _active_candidate_ids_for_check(turns: list[dict], checks: list[dict], current_idx: int) -> set[str]:
+    if not checks:
+        return _candidate_ids_from_turns(turns[: current_idx + 1])
+    previous_check = checks[-1]
+    active_ids = set(previous_check.get("view_requested_product_ids") or [])
+    retry_turns = turns[previous_check["end_turn_index"] + 1 : current_idx + 1]
+    active_ids.update(_candidate_ids_from_turns(retry_turns))
+    return {str(product_id) for product_id in active_ids if product_id is not None}
+
+
 def _valid_checks_from_turns(turns: list[dict]) -> list[dict]:
     checks = []
     latest_nonempty_find_idx = -1
-    latest_view_records = []
+    accumulated_view_records = []
 
     for idx, turn in enumerate(turns):
         if any(
@@ -371,7 +444,7 @@ def _valid_checks_from_turns(turns: list[dict]) -> list[dict]:
             for record in turn.get("records", [])
         ):
             latest_nonempty_find_idx = idx
-            latest_view_records = []
+            accumulated_view_records = []
 
         turn_view_records = [
             {"turn_index": idx, "record": record}
@@ -379,27 +452,49 @@ def _valid_checks_from_turns(turns: list[dict]) -> list[dict]:
             if _valid_view_record(record)
         ]
         if turn_view_records:
-            latest_view_records = turn_view_records
+            accumulated_view_records.extend(turn_view_records)
 
         for record in turn.get("records", []):
-            if not _valid_python_record(record) or not latest_view_records:
+            if not _valid_python_record(record) or not accumulated_view_records:
                 continue
-            if max(item["turn_index"] for item in latest_view_records) <= latest_nonempty_find_idx:
+            if max(item["turn_index"] for item in accumulated_view_records) <= latest_nonempty_find_idx:
                 continue
             parsed_budget = _parse_python_result(record.get("results"))
-            view_records = [item["record"] for item in latest_view_records]
-            view_ids = _combined_view_requested_ids(view_records)
+            candidate_ids = _active_candidate_ids_for_check(turns, checks, idx)
+            products_by_id = {
+                product_id: product
+                for product_id, product in _collect_products_by_id(turns[: idx + 1]).items()
+                if product_id in candidate_ids
+            }
+            if not _budget_matches_candidate_evidence(parsed_budget, products_by_id):
+                continue
             budget_ids = _budget_product_ids(parsed_budget)
-            if not _ids_consistent(view_ids, budget_ids):
+            candidate_view_sets = []
+            if turn_view_records:
+                candidate_view_sets.append([item["record"] for item in turn_view_records])
+            candidate_view_sets.append([item["record"] for item in accumulated_view_records])
+            matched_view_records = None
+            matched_view_ids = []
+            for view_records in candidate_view_sets:
+                view_ids = _combined_view_requested_ids(view_records)
+                if _ids_consistent(view_ids, budget_ids) and set(view_ids).issubset(candidate_ids):
+                    matched_view_records = view_records
+                    matched_view_ids = view_ids
+                    break
+            if matched_view_records is None:
                 continue
             checks.append(
                 {
-                    "view_turn_index": max(item["turn_index"] for item in latest_view_records),
+                    "view_turn_index": max(
+                        item["turn_index"]
+                        for item in accumulated_view_records
+                        if item["record"] in matched_view_records
+                    ),
                     "python_turn_index": idx,
                     "end_turn_index": idx,
-                    "view_records": view_records,
+                    "view_records": matched_view_records,
                     "python_record": record,
-                    "view_requested_product_ids": view_ids,
+                    "view_requested_product_ids": matched_view_ids,
                     "budget_product_ids": budget_ids,
                 }
             )
@@ -422,6 +517,15 @@ def _failed_retry_records_from_turns(turns: list[dict], checks: list[dict]) -> l
             if record.get("name") == "find_product" and _empty_find_results(record.get("results")):
                 failed.append(record.get("parameters", {}))
     return failed
+
+
+def _empty_find_records_from_turns(turns: list[dict]) -> list[dict]:
+    return [
+        record.get("parameters", {})
+        for turn in turns
+        for record in turn.get("records", [])
+        if record.get("name") == "find_product" and _empty_find_results(record.get("results"))
+    ]
 
 
 def _decision_state_from_check(
@@ -517,6 +621,7 @@ def build_harness_snapshot(
     latest_nonempty_find_idx = None
     first_nonempty_find_seen = False
     cold_failed_searches = []
+    all_empty_searches = _empty_find_records_from_turns(turns)
 
     for idx, turn in enumerate(turns):
         for record in turn.get("records", []):
@@ -532,7 +637,7 @@ def build_harness_snapshot(
         if latest_nonempty_find_idx is None:
             state_name = STATE_CANDIDATE_SEARCH
             state = {}
-            failed_searches = _unique_searches(cold_failed_searches)
+            failed_searches = _unique_searches(all_empty_searches)
             if failed_searches:
                 state["failed_searches"] = failed_searches
         else:
@@ -546,10 +651,7 @@ def build_harness_snapshot(
         if any(record.get("name") == "find_product" for record in turns[idx].get("records", []))
     ]
     latest_retry_nonempty_idx = None
-    failed_retry_records = [
-        *cold_failed_searches,
-        *_failed_retry_records_from_turns(turns, valid_checks),
-    ]
+    failed_retry_records = all_empty_searches
     for idx in retry_find_indices:
         turn = turns[idx]
         turn_has_nonempty = False
@@ -586,6 +688,80 @@ def build_harness_user_prompt(snapshot: HarnessSnapshot, history_messages: list[
     query = _first_user_message(history_messages)
     state_text = json.dumps(snapshot.state, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return "# Dialogue Records History\n" + f"<user>{query}</user>\n\n<state>{state_text}</state>"
+
+
+def build_harness_user_prompt_with_instructions(
+    snapshot: HarnessSnapshot,
+    history_messages: list[str],
+) -> str:
+    from util.system_prompt import build_system_prompt
+
+    instructions = build_system_prompt(
+        snapshot.prompt_file,
+        include_tools=snapshot.include_tools,
+    )
+    return (
+        "# Harness State Instructions\n"
+        + instructions
+        + "\n\n"
+        + build_harness_user_prompt(snapshot, history_messages)
+    )
+
+
+def _brief_state_instructions(snapshot: HarnessSnapshot) -> str:
+    tools = ", ".join(sorted(snapshot.include_tools))
+    if snapshot.state_name == STATE_CANDIDATE_SEARCH:
+        rules = [
+            "Use only find_product.",
+            'find_product parameters: {"q": string, "page": integer}; optional keys include shop_id, price, sort, and service.',
+            "Choose queries from the user request and cover all requested product needs.",
+            "Do not repeat exact parameters listed in failed_searches.",
+            "Multiple independent calls may be placed in one JSON array.",
+        ]
+    elif snapshot.state_name == STATE_CANDIDATE_SELECT:
+        rules = [
+            "Use only view_product_information and python_execute.",
+            'view_product_information parameters: {"product_ids": "id1,id2"}.',
+            'python_execute parameters: {"code": string}. The code must print one JSON object.',
+            "Choose product ids only from candidate_pool.",
+            "Use python_execute to calculate voucher eligibility, payable_total, budget, and within_budget from the user's query, using selected ids, shop ids, and prices from candidate_pool.",
+            "The printed JSON must include product_ids, shop_ids, total_before_voucher, payable_total, budget, within_budget, and voucher_used.",
+            "The budget JSON must match candidate_pool prices and shop ids.",
+        ]
+    else:
+        rules = [
+            "Use only find_product, recommend_product, and terminate.",
+            'find_product parameters: {"q": string, "page": integer}; optional keys include shop_id, price, sort, and service.',
+            'recommend_product parameters: {"product_ids": "id1,id2"}.',
+            'terminate parameters: {"status": "success"}.',
+            "If the selected products satisfy the user request, the voucher/budget calculation is correct for the user's query, and within_budget is true, output recommend_product and terminate in the same JSON array.",
+            "If voucher eligibility, payable_total, budget, or within_budget is invalid or inconsistent with the user's query, output only find_product calls.",
+            "Otherwise output only find_product calls for replacement candidates.",
+            "Do not repeat exact parameters listed in failed_retry_searches.",
+        ]
+    return "\n".join(
+        [
+            f"Current state: {snapshot.state_name}",
+            f"Allowed tools: {tools}",
+            "Use only the latest <state> block in this message for state decisions.",
+            "Output exactly one <think> block followed by exactly one <tool_call> block.",
+            "The <tool_call> block must contain one JSON array of calls, each with name and parameters.",
+            "Rules:",
+            *[f"- {rule}" for rule in rules],
+        ]
+    )
+
+
+def build_harness_user_prompt_with_brief_instructions(
+    snapshot: HarnessSnapshot,
+    history_messages: list[str],
+) -> str:
+    return (
+        "# Harness State Instructions\n"
+        + _brief_state_instructions(snapshot)
+        + "\n\n"
+        + build_harness_user_prompt(snapshot, history_messages)
+    )
 
 
 def search_trace_markdown(query: str, search_trace: list[dict]) -> str:

@@ -16,6 +16,7 @@ from util.message import Message, USER_ROLES, ASSISTANT_ROLES
 from util.harness_fsm import (
     build_harness_snapshot,
     build_harness_user_prompt,
+    is_repeated_failed_search,
     search_trace_markdown,
 )
 from util.system_prompt import build_system_prompt
@@ -101,7 +102,7 @@ def think(
     return reasoning_content, content, Message.from_string(reasoning_content, content)
 
 
-def act(message: Message, allowed_tools: set[str] | None = None) -> list[dict]:
+def act(message: Message, allowed_tools: set[str] | None = None, harness_snapshot=None) -> list[dict]:
     obs = []
     tool_names = {commend["name"] for commend in message.tool_call}
     mixed_decision_actions = (
@@ -115,6 +116,12 @@ def act(message: Message, allowed_tools: set[str] | None = None) -> list[dict]:
         and {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools)
         and "terminate" in tool_names
         and "recommend_product" not in tool_names
+    )
+    lone_decision_recommend = (
+        allowed_tools is not None
+        and {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools)
+        and "recommend_product" in tool_names
+        and "terminate" not in tool_names
     )
     for commend in message.tool_call:
         if mixed_decision_actions:
@@ -139,6 +146,17 @@ def act(message: Message, allowed_tools: set[str] | None = None) -> list[dict]:
                 }
             )
             continue
+        if lone_decision_recommend and commend["name"] == "recommend_product":
+            obs.append(
+                {
+                    "tool_call_id": commend["tool_call_id"],
+                    "results": {
+                        "error": "recommend_product_requires_terminate_in_decision",
+                        "tool": commend["name"],
+                    },
+                }
+            )
+            continue
         if allowed_tools is not None and commend["name"] not in allowed_tools:
             obs.append(
                 {
@@ -147,6 +165,21 @@ def act(message: Message, allowed_tools: set[str] | None = None) -> list[dict]:
                         "error": "tool_not_allowed_in_current_state",
                         "tool": commend["name"],
                         "allowed_tools": sorted(allowed_tools),
+                    },
+                }
+            )
+            continue
+        if (
+            harness_snapshot is not None
+            and commend["name"] == "find_product"
+            and is_repeated_failed_search(commend.get("parameters", {}), harness_snapshot)
+        ):
+            obs.append(
+                {
+                    "tool_call_id": commend["tool_call_id"],
+                    "results": {
+                        "error": "repeated_failed_search_not_allowed",
+                        "tool": commend["name"],
                     },
                 }
             )
@@ -185,6 +218,13 @@ def is_terminate(
         and {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools)
         and "terminate" in tool_names
         and "recommend_product" not in tool_names
+    ):
+        return False
+    if (
+        allowed_tools is not None
+        and {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools)
+        and "recommend_product" in tool_names
+        and "terminate" not in tool_names
     ):
         return False
     if (config or {}).get("stop_after_recommend") and "recommend_product" in tool_names:
@@ -229,10 +269,20 @@ def react_loop(query: str, config: dict):
             base_url=config.get("base_url", ""),
             api_key=config.get("api_key", ""),
         )
-        if message.tool_call:
+        if message.format_error:
+            message.obs = [
+                {
+                    "tool_call_id": "format_error",
+                    "results": {
+                        "error": message.format_error,
+                    },
+                }
+            ]
+        elif message.tool_call:
             message.obs = act(
                 message,
                 allowed_tools=harness_snapshot.include_tools if harness_snapshot else None,
+                harness_snapshot=harness_snapshot,
             )
 
         corpus_tracker.append(

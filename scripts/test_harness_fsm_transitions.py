@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:
 if str(AGENT_SRC) not in sys.path:
     sys.path.insert(0, str(AGENT_SRC))
 
-from util.harness_fsm import build_harness_snapshot  # noqa: E402
+from util.harness_fsm import build_harness_snapshot, is_repeated_failed_search  # noqa: E402
 from util.message import Message  # noqa: E402
 
 
@@ -63,6 +63,14 @@ def assert_state(history: list[str], expected: str, label: str):
 
 
 def main() -> None:
+    parsed = Message.from_string(
+        "",
+        '<think>x</think><tool_call>[{"name":"find_product","parameters":{"q":"a","page":1}}]</tool_call>'
+        '<tool_call>[{"name":"find_product","parameters":{"q":"b","page":1}}]</tool_call>',
+    )
+    assert parsed.tool_call == []
+    assert parsed.format_error == "exactly_one_tool_call_block_required"
+
     history = [user("Need black wireless earbuds under my voucher budget")]
     assert_state(history, "CANDIDATE_SEARCH", "initial")
 
@@ -70,6 +78,8 @@ def main() -> None:
     history.append(step([call], [obs]))
     snapshot = assert_state(history, "CANDIDATE_SEARCH", "SEARCH->SEARCH")
     assert snapshot.state == {"failed_searches": [{"q": "black wireless earbuds", "page": 1}]}
+    assert is_repeated_failed_search({"q": "black wireless earbuds", "page": 1}, snapshot)
+    assert not is_repeated_failed_search({"q": "wireless earbuds", "page": 1}, snapshot)
 
     call, obs = find(
         "s1",
@@ -128,6 +138,7 @@ def main() -> None:
         {"q": "black wireless earbuds", "page": 1},
         {"q": "cheaper black wireless earbuds", "page": 1}
     ]
+    assert is_repeated_failed_search({"q": "cheaper black wireless earbuds", "page": 1}, snapshot)
 
     call, obs = find(
         "r1",
@@ -170,6 +181,62 @@ def main() -> None:
         {"q": "black wireless earbuds", "page": 1},
         {"q": "cheaper black wireless earbuds", "page": 1}
     ]
+
+    stale_candidate = [user("Need black wireless earbuds")]
+    call, obs = find(
+        "stq",
+        "wireless earbuds",
+        [
+            {"product_id": "p1", "shop_id": "shop1", "title": "Black earbuds", "price": 120, "service": []},
+            {"product_id": "pX", "shop_id": "shopX", "title": "Stale earbuds", "price": 70, "service": []},
+        ],
+    )
+    stale_candidate.append(step([call], [obs]))
+    view_call, view_obs = view(
+        "stv1",
+        "p1",
+        [{"product_id": "p1", "sku_options": {}, "attributes": {"Color": "Black"}, "service": []}],
+    )
+    py_call, py_obs = python_calc(
+        "stpy1",
+        {
+            "product_ids": ["p1"],
+            "shop_ids": ["shop1"],
+            "total_before_voucher": 120,
+            "voucher_used": True,
+            "payable_total": 110,
+            "budget": 100,
+            "within_budget": False,
+        },
+    )
+    stale_candidate.append(step([view_call, py_call], [view_obs, py_obs]))
+    call, obs = find(
+        "strq",
+        "cheaper black earbuds",
+        [{"product_id": "p2", "shop_id": "shop2", "title": "Budget black earbuds", "price": 90, "service": []}],
+    )
+    stale_candidate.append(step([call], [obs]))
+    snapshot = assert_state(stale_candidate, "CANDIDATE_SELECT", "retry candidate pool excludes stale unselected candidates")
+    assert {item["product_id"] for item in snapshot.state["candidate_pool"]} == {"p1", "p2"}
+    view_call, view_obs = view(
+        "stvx",
+        "pX",
+        [{"product_id": "pX", "sku_options": {}, "attributes": {"Color": "Black"}, "service": []}],
+    )
+    py_call, py_obs = python_calc(
+        "stpyx",
+        {
+            "product_ids": ["pX"],
+            "shop_ids": ["shopX"],
+            "total_before_voucher": 70,
+            "voucher_used": True,
+            "payable_total": 70,
+            "budget": 100,
+            "within_budget": True,
+        },
+    )
+    stale_candidate.append(step([view_call, py_call], [view_obs, py_obs]))
+    assert_state(stale_candidate, "CANDIDATE_SELECT", "stale candidate outside active pool is rejected")
 
     multi = [user("Need a shirt and pants")]
     call, obs = find(
@@ -255,6 +322,60 @@ def main() -> None:
     )
     missing_budget_ids.append(step([view_call, py_call], [view_obs, py_obs]))
     assert_state(missing_budget_ids, "CANDIDATE_SELECT", "budget ids required for DECISION")
+
+    wrong_budget_total = [user("Need black earbuds")]
+    call, obs = find(
+        "wbtq",
+        "black earbuds",
+        [{"product_id": "p1", "shop_id": "shop1", "title": "Black earbuds", "price": 120, "service": []}],
+    )
+    wrong_budget_total.append(step([call], [obs]))
+    view_call, view_obs = view(
+        "wbtv",
+        "p1",
+        [{"product_id": "p1", "sku_options": {}, "attributes": {"Color": "Black"}, "service": []}],
+    )
+    py_call, py_obs = python_calc(
+        "wbtpy",
+        {
+            "product_ids": ["p1"],
+            "shop_ids": ["shop1"],
+            "total_before_voucher": 1,
+            "voucher_used": True,
+            "payable_total": 1,
+            "budget": 100,
+            "within_budget": True,
+        },
+    )
+    wrong_budget_total.append(step([view_call, py_call], [view_obs, py_obs]))
+    assert_state(wrong_budget_total, "CANDIDATE_SELECT", "budget total must match candidate evidence")
+
+    duplicate_budget_ids = [user("Need black earbuds")]
+    call, obs = find(
+        "dbiq",
+        "black earbuds",
+        [{"product_id": "p1", "shop_id": "shop1", "title": "Black earbuds", "price": 120, "service": []}],
+    )
+    duplicate_budget_ids.append(step([call], [obs]))
+    view_call, view_obs = view(
+        "dbiv",
+        "p1",
+        [{"product_id": "p1", "sku_options": {}, "attributes": {"Color": "Black"}, "service": []}],
+    )
+    py_call, py_obs = python_calc(
+        "dbipy",
+        {
+            "product_ids": ["p1", "p1"],
+            "shop_ids": ["shop1", "shop1"],
+            "total_before_voucher": 240,
+            "voucher_used": True,
+            "payable_total": 200,
+            "budget": 220,
+            "within_budget": True,
+        },
+    )
+    duplicate_budget_ids.append(step([view_call, py_call], [view_obs, py_obs]))
+    assert_state(duplicate_budget_ids, "CANDIDATE_SELECT", "duplicate budget product ids are rejected")
 
     partial_view = [user("Need two earbuds")]
     call, obs = find(
@@ -354,6 +475,42 @@ def main() -> None:
     split_view.append(step([view_call_1, view_call_2, py_call], [view_obs_1, view_obs_2, py_obs]))
     assert_state(split_view, "DECISION", "split view calls are combined")
 
+    split_view_across_turns = [user("Need two earbuds")]
+    call, obs = find(
+        "svatq",
+        "earbuds",
+        [
+            {"product_id": "p1", "shop_id": "shop1", "title": "Black earbuds", "price": 120, "service": []},
+            {"product_id": "p2", "shop_id": "shop1", "title": "Backup earbuds", "price": 80, "service": []},
+        ],
+    )
+    split_view_across_turns.append(step([call], [obs]))
+    view_call, view_obs = view(
+        "svatv1",
+        "p1",
+        [{"product_id": "p1", "sku_options": {}, "attributes": {"Color": "Black"}, "service": []}],
+    )
+    split_view_across_turns.append(step([view_call], [view_obs]))
+    view_call, view_obs = view(
+        "svatv2",
+        "p2",
+        [{"product_id": "p2", "sku_options": {}, "attributes": {"Color": "Black"}, "service": []}],
+    )
+    py_call, py_obs = python_calc(
+        "svatpy",
+        {
+            "product_ids": ["p1", "p2"],
+            "shop_ids": ["shop1", "shop1"],
+            "total_before_voucher": 200,
+            "voucher_used": True,
+            "payable_total": 180,
+            "budget": 210,
+            "within_budget": True,
+        },
+    )
+    split_view_across_turns.append(step([view_call, py_call], [view_obs, py_obs]))
+    assert_state(split_view_across_turns, "DECISION", "split view calls across turns are combined when needed")
+
     changed_selection = [user("Need earbuds")]
     call, obs = find(
         "csq",
@@ -390,6 +547,58 @@ def main() -> None:
     changed_selection.append(step([view_call, py_call], [view_obs, py_obs]))
     snapshot = assert_state(changed_selection, "DECISION", "later view selection supersedes stale partial view")
     assert snapshot.state["view_requested_product_ids"] == ["p2"]
+
+    arbitrary_id = [user("Need earbuds")]
+    call, obs = find(
+        "aiq",
+        "earbuds",
+        [{"product_id": "p1", "shop_id": "shop1", "title": "Black earbuds", "price": 120, "service": []}],
+    )
+    arbitrary_id.append(step([call], [obs]))
+    view_call, view_obs = view(
+        "aiv",
+        "p999",
+        [{"product_id": "p999", "sku_options": {}, "attributes": {}, "service": []}],
+    )
+    py_call, py_obs = python_calc(
+        "aipy",
+        {
+            "product_ids": ["p999"],
+            "shop_ids": ["shopX"],
+            "total_before_voucher": 100,
+            "voucher_used": True,
+            "payable_total": 90,
+            "budget": 110,
+            "within_budget": True,
+        },
+    )
+    arbitrary_id.append(step([view_call, py_call], [view_obs, py_obs]))
+    assert_state(arbitrary_id, "CANDIDATE_SELECT", "selected ids must come from candidate_pool")
+
+    mixed_search = [user("Need earbuds and charger")]
+    c1, o1 = find("mix1", "earbuds", [{"product_id": "p1", "shop_id": "shop1", "title": "Earbuds", "price": 120, "service": []}])
+    c2, o2 = find("mix2", "charger", [])
+    mixed_search.append(step([c1, c2], [o1, o2]))
+    view_call, view_obs = view(
+        "mixv",
+        "p1",
+        [{"product_id": "p1", "sku_options": {}, "attributes": {}, "service": []}],
+    )
+    py_call, py_obs = python_calc(
+        "mixpy",
+        {
+            "product_ids": ["p1"],
+            "shop_ids": ["shop1"],
+            "total_before_voucher": 120,
+            "voucher_used": True,
+            "payable_total": 100,
+            "budget": 130,
+            "within_budget": True,
+        },
+    )
+    mixed_search.append(step([view_call, py_call], [view_obs, py_obs]))
+    snapshot = assert_state(mixed_search, "DECISION", "mixed search empty is carried into decision")
+    assert snapshot.state["failed_retry_searches"] == [{"q": "charger", "page": 1}]
 
     malformed = [user("Need earbuds")]
     call = {"name": "find_product", "parameters": {"q": "earbuds", "page": 1}, "tool_call_id": "bad"}

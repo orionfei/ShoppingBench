@@ -49,6 +49,7 @@ class Message(BaseModel):
     tool_call: list[dict] = []
     obs: list[dict] = []
     response: str = ""
+    format_error: str = ""
 
     def to_dict(self, roles: list[str] = []) -> dict:
         if not roles:
@@ -85,6 +86,7 @@ class Message(BaseModel):
         setattr(self, "tool_call", [])
         setattr(self, "obs", [])
         setattr(self, "response", "")
+        setattr(self, "format_error", "")
 
     @classmethod
     def from_dict(clf, message: dict):
@@ -93,7 +95,12 @@ class Message(BaseModel):
     @classmethod
     def from_string(clf, reasoning_content: str, content: str):
         tmp = dict()
+        invalid_tool_call_blocks = content.count("<tool_call>") != content.count("</tool_call>") or content.count("<tool_call>") > 1
+        if invalid_tool_call_blocks:
+            tmp["format_error"] = "exactly_one_tool_call_block_required"
         for role in OUTPUT_ROLES:
+            if role == "tool_call" and invalid_tool_call_blocks:
+                continue
             matchobj = re.search(f"<{role}>(.+?)</{role}>", content, re.DOTALL)
             if matchobj:
                 tmp[role] = matchobj.group(1).strip()
