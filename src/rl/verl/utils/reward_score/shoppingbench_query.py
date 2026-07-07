@@ -15,9 +15,11 @@ LEGAL_TOOLS = {
     "find_product",
     "view_product_information",
     "recommend_product",
+    "budget_check",
     "python_execute",
     "terminate",
 }
+BUDGET_TOOLS = {"python_execute", "budget_check"}
 
 PROGRESS_WEIGHTS = {
     "find_correct": 0.20,
@@ -277,6 +279,16 @@ def _events_from_messages(messages: list[dict[str, Any]]) -> tuple[list[str], li
                         event.observation_text = json.dumps(raw_obs["results"], ensure_ascii=False)
             continue
 
+        if role == "user" and isinstance(direct_obs, list):
+            for raw_obs in direct_obs:
+                if not pending:
+                    break
+                event = pending.pop(0)
+                if isinstance(raw_obs, dict) and "results" in raw_obs:
+                    event.observation = raw_obs["results"]
+                    event.observation_text = json.dumps(raw_obs["results"], ensure_ascii=False)
+            continue
+
         if role == "tool":
             obs_texts = [content]
         elif role == "user":
@@ -335,13 +347,13 @@ def _workflow_validity(messages: list[dict[str, Any]]) -> float:
         if phase == "DONE":
             return 0.0
 
-        if "find_product" in tool_names and bool({"view_product_information", "python_execute", "recommend_product", "terminate"} & tool_names):
+        if "find_product" in tool_names and bool({"view_product_information", "python_execute", "budget_check", "recommend_product", "terminate"} & tool_names):
             return 0.0
         if "terminate" in tool_names and "recommend_product" not in tool_names:
             return 0.0
         if "recommend_product" in tool_names and "terminate" not in tool_names:
             return 0.0
-        if "recommend_product" in tool_names and bool({"view_product_information", "python_execute"} & tool_names):
+        if "recommend_product" in tool_names and bool({"view_product_information", "python_execute", "budget_check"} & tool_names):
             return 0.0
 
         if tool_names == {"find_product"}:
@@ -350,12 +362,12 @@ def _workflow_validity(messages: list[dict[str, Any]]) -> float:
             pending_view = False
             continue
 
-        if tool_names <= {"view_product_information", "python_execute"}:
+        if tool_names <= {"view_product_information", "python_execute", "budget_check"}:
             if not saw_find or phase not in {"SEARCH", "SELECT"}:
                 return 0.0
             if "view_product_information" in tool_names:
                 pending_view = True
-            if "python_execute" in tool_names:
+            if tool_names & BUDGET_TOOLS:
                 if not pending_view:
                     return 0.0
                 phase = "DECISION"
@@ -529,6 +541,13 @@ def _parse_budget_calc_from_python(event: ToolEvent) -> dict[str, Any] | None:
     return {"_success": success is not False, "stdout": stdout}
 
 
+def _parse_budget_calc_from_budget_check(event: ToolEvent) -> dict[str, Any] | None:
+    obs = event.observation
+    if not isinstance(obs, dict) or obs.get("error"):
+        return None
+    return dict(obs)
+
+
 def _ids_from_python_code(code: str) -> list[str]:
     patterns = [
         r"\bproduct_ids\s*[:=]\s*(\[[^\]]+\])",
@@ -692,6 +711,14 @@ def _trajectory_state(events: list[ToolEvent], states: list[dict[str, Any]] | No
             else:
                 ids = _ids_from_python_code(code)
                 if ids and calc_is_budget:
+                    selected_ids = ids
+        elif event.name == "budget_check":
+            calc = _parse_budget_calc_from_budget_check(event)
+            if calc:
+                budget_attempted = True
+                budget_calcs.append(calc)
+                ids = _product_ids(calc.get("product_ids"))
+                if ids:
                     selected_ids = ids
 
     for state in states or []:
@@ -891,6 +918,8 @@ def _tool_validity(events: list[ToolEvent], assistant_texts: list[str]) -> float
         params = event.parameters
         obs = event.observation
         ok = event.name in LEGAL_TOOLS and isinstance(params, dict)
+        if isinstance(obs, dict) and "error" in obs:
+            ok = False
         if event.name == "find_product":
             ok = ok and isinstance(params.get("q"), str) and params.get("page") is not None and isinstance(obs, list)
         elif event.name == "view_product_information":
@@ -901,6 +930,15 @@ def _tool_validity(events: list[ToolEvent], assistant_texts: list[str]) -> float
             ok = ok and params.get("status") in {"success", "failure"} and event.observation_text is not None
         elif event.name == "python_execute":
             ok = ok and isinstance(params.get("code"), str) and isinstance(obs, dict) and obs.get("success") is not False
+        elif event.name == "budget_check":
+            ok = (
+                ok
+                and bool(_product_ids(params.get("product_ids")))
+                and isinstance(params.get("voucher"), dict)
+                and params.get("budget") is not None
+                and isinstance(obs, dict)
+                and "error" not in obs
+            )
         scores.append(1.0 if ok else 0.0)
     return sum(scores) / len(scores)
 

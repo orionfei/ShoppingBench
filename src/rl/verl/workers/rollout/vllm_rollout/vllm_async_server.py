@@ -362,7 +362,14 @@ class AsyncvLLMServer(AsyncServerBase):
             return JSONResponse(content=generator.model_dump())
 
     async def generate(self, prompt_ids: list[int], sampling_params: dict[str, Any], request_id: str) -> list[int]:
+        sampling_params = dict(sampling_params)
+        requested_max_tokens = sampling_params.pop("max_tokens", None)
+        requested_max_new_tokens = sampling_params.pop("max_new_tokens", None)
         max_tokens = self.max_model_len - len(prompt_ids)
+        if requested_max_tokens is not None:
+            max_tokens = min(max_tokens, int(requested_max_tokens))
+        if requested_max_new_tokens is not None:
+            max_tokens = min(max_tokens, int(requested_max_new_tokens))
         sampling_params = SamplingParams(max_tokens=max_tokens, **sampling_params)
         prompt = TokensPrompt(prompt_token_ids=prompt_ids)
         generator = self.engine.generate(prompt=prompt, sampling_params=sampling_params, request_id=request_id)

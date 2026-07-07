@@ -57,7 +57,11 @@ class ShoppingBenchRecommendProductTool(BaseTool):
 class ShoppingBenchTerminateTool(BaseTool):
     async def execute(self, instance_id: str, parameters: dict[str, Any], **kwargs) -> tuple[str, float, dict]:
         status = parameters.get("status", "")
-        return f"The interaction has been completed with status: {status}", 0.0, {"ok": status == "success"}
+        payload = {
+            "status": status,
+            "_tool_success": status == "success",
+        }
+        return json.dumps(payload, ensure_ascii=False), 0.0, {"ok": status == "success"}
 
 
 class ShoppingBenchPythonExecuteTool(BaseTool):

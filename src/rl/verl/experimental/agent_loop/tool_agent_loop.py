@@ -34,8 +34,9 @@ if str(AGENT_SRC) not in sys.path:
     sys.path.insert(0, str(AGENT_SRC))
 
 from util.harness_fsm import (  # noqa: E402
+    STATE_CANDIDATE_SELECT,
     build_harness_snapshot,
-    build_harness_user_prompt_with_brief_instructions,
+    build_compact_harness_user_prompt,
     is_repeated_failed_search,
 )
 from util.message import ASSISTANT_ROLES, USER_ROLES, Message, generate_tool_call_id  # noqa: E402
@@ -45,9 +46,26 @@ logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
 FSM_SYSTEM_PROMPT = (
-    "You are a ShoppingBench agent. Follow the current harness state instructions "
-    "in the user message exactly."
+    "You are a ShoppingBench agent. Read the latest <state> JSON and output exactly one "
+    "<tool_call> JSON array. Only tools listed in allowed_tools are valid."
 )
+
+BUDGET_CHECK_TOOL_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "budget_check",
+        "description": "Compute voucher-adjusted budget from selected product ids, observed candidate prices, and the agent's structured voucher interpretation.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "product_ids": {"type": "array", "description": "Selected product ids from candidate_pool."},
+                "voucher": {"type": "object", "description": "Structured interpretation of the user's voucher."},
+                "budget": {"type": "number", "description": "User budget parsed by the agent from the query."},
+            },
+            "required": ["product_ids", "voucher", "budget"],
+        },
+    },
+}
 
 
 class FunctionCall(BaseModel):
@@ -159,6 +177,8 @@ class ToolAgentLoop(AgentLoopBase):
         tool_list = initialize_tools_from_config(tool_config_path) if tool_config_path else []
         cls.tools = {tool.name: tool for tool in tool_list}
         cls.tool_schemas = [tool.tool_schema.model_dump(exclude_unset=True, exclude_none=True) for tool in tool_list]
+        if "budget_check" not in {schema.get("function", {}).get("name") for schema in cls.tool_schemas}:
+            cls.tool_schemas.append(BUDGET_CHECK_TOOL_SCHEMA)
         cls.tool_parser = cls.get_tool_parser(config.actor_rollout_ref.rollout.multi_turn.format)
         print(f"Initialized tools: {cls.tools}")
 
@@ -187,17 +207,22 @@ class ToolAgentLoop(AgentLoopBase):
         if system_prompt_file in (None, "", "null", "None"):
             cls.runtime_system_prompt = None
         else:
-            cls.runtime_system_prompt = build_system_prompt(str(system_prompt_file), exclude_tools={"web_search"})
+            cls.runtime_system_prompt = build_system_prompt(
+                str(system_prompt_file),
+                exclude_tools={"web_search", "python_execute"},
+            )
 
     @rollout_trace_op
     async def run(self, messages: list[dict[str, Any]], sampling_params: dict[str, Any]) -> AgentLoopOutput:
         metrics = {}
         request_id = uuid4().hex
-        system_message = {"role": "system", "content": FSM_SYSTEM_PROMPT}
+        system_message = self._system_message(messages)
         query = self._initial_user_query(messages)
         history_messages = [Message(user=query).to_string(USER_ROLES)]
-        active_snapshot = build_harness_snapshot(history_messages)
-        user_prompt = build_harness_user_prompt_with_brief_instructions(active_snapshot, history_messages)
+        active_snapshot = self._state_local_snapshot(
+            build_harness_snapshot(history_messages, allow_legacy_python_budget=False)
+        )
+        user_prompt = self._compact_state_prompt(active_snapshot, history_messages)
         current_messages = [system_message, {"role": "user", "content": user_prompt}]
         prompt_ids = await self.loop.run_in_executor(
             None,
@@ -208,9 +233,15 @@ class ToolAgentLoop(AgentLoopBase):
 
         user_turns, assistant_turns = 0, 0
         while True:
+            generation_sampling_params = self._sampling_params_for_remaining_response(
+                sampling_params,
+                used_response_tokens=len(response_mask),
+            )
+            if generation_sampling_params is None:
+                break
             with simple_timer("generate_sequences", metrics):
                 response_ids = await self.server_manager.generate(
-                    request_id=request_id, prompt_ids=prompt_ids, sampling_params=sampling_params
+                    request_id=request_id, prompt_ids=prompt_ids, sampling_params=generation_sampling_params
                 )
             prompt_ids += response_ids
             response_mask += [1] * len(response_ids)
@@ -265,7 +296,7 @@ class ToolAgentLoop(AgentLoopBase):
                     tool_responses[idx] = self._tool_error_response(tool_call, validation_error)
                     continue
                 task_indices.append(idx)
-                tasks.append(self._call_tool(tool_call))
+                tasks.append(self._call_tool(tool_call, active_snapshot))
             with simple_timer("tool_calls", metrics):
                 executed_responses = await asyncio.gather(*tasks) if tasks else []
             if any(isinstance(item, Exception) for item in tool_responses):
@@ -283,17 +314,16 @@ class ToolAgentLoop(AgentLoopBase):
                     tool_results=tool_responses,
                 )
             )
-            for item in tool_responses:
-                rollout_messages.append({"role": "user", "content": f"<obs>{item['tool_response']}</obs>"})
 
-            if any(
-                item["name"] == "terminate" and not self._is_error_result(item.get("result"))
-                for item in tool_responses
-            ):
+            if any(self._is_successful_terminate(item) for item in tool_responses):
+                for item in tool_responses:
+                    rollout_messages.append(self._obs_record(item))
                 break
 
-            active_snapshot = build_harness_snapshot(history_messages)
-            next_user_prompt = build_harness_user_prompt_with_brief_instructions(active_snapshot, history_messages)
+            active_snapshot = self._state_local_snapshot(
+                build_harness_snapshot(history_messages, allow_legacy_python_budget=False)
+            )
+            next_user_prompt = self._compact_state_prompt(active_snapshot, history_messages)
             state_prompt_ids = await self.loop.run_in_executor(
                 None,
                 lambda: self.tokenizer.apply_chat_template(
@@ -308,6 +338,8 @@ class ToolAgentLoop(AgentLoopBase):
             if len(response_mask) + len(state_prompt_ids) >= self.response_length:
                 break
 
+            for item in tool_responses:
+                rollout_messages.append(self._obs_record(item))
             prompt_ids += state_prompt_ids
             response_mask += [0] * len(state_prompt_ids)
             rollout_messages.append({"role": "user", "content": next_user_prompt})
@@ -325,6 +357,74 @@ class ToolAgentLoop(AgentLoopBase):
             messages=rollout_messages,
         )
         return output
+
+    def _state_local_snapshot(self, snapshot):
+        if snapshot.state_name == STATE_CANDIDATE_SELECT:
+            snapshot.include_tools = {"view_product_information", "budget_check"}
+        max_failed = self.state_max_searches or 5
+        if isinstance(snapshot.state, dict) and max_failed:
+            if "failed_searches" in snapshot.state:
+                snapshot.state["failed_searches"] = (snapshot.state.get("failed_searches") or [])[-max_failed:]
+            if "failed_retry_searches" in snapshot.state:
+                snapshot.state["failed_retry_searches"] = (snapshot.state.get("failed_retry_searches") or [])[-max_failed:]
+        return snapshot
+
+    def _compact_state_prompt(self, snapshot, history_messages: list[str]) -> str:
+        max_candidates = self.state_max_budget_candidates or self.state_max_candidates_per_search
+        return build_compact_harness_user_prompt(
+            snapshot,
+            history_messages,
+            max_candidates=max_candidates,
+            max_failed_searches=self.state_max_searches or 5,
+            max_viewed_products=self.state_max_viewed_products,
+        )
+
+    def _sampling_params_for_remaining_response(
+        self,
+        sampling_params: dict[str, Any],
+        *,
+        used_response_tokens: int,
+    ) -> dict[str, Any] | None:
+        remaining = self.response_length - used_response_tokens
+        params = dict(sampling_params)
+        if remaining <= 0:
+            return None
+        for key in ("max_tokens", "max_new_tokens"):
+            existing = params.get(key)
+            params[key] = min(int(existing), remaining) if existing is not None else remaining
+        return params
+
+    def _truncate_tool_response(self, text: str) -> str:
+        max_len = self.max_tool_response_length
+        if not max_len or max_len <= 0:
+            return text
+        token_ids = self.tokenizer.encode(text, add_special_tokens=False)
+        if len(token_ids) <= max_len:
+            return text
+        if self.tool_response_truncate_side == "left":
+            token_ids = token_ids[-max_len:]
+        elif self.tool_response_truncate_side == "middle":
+            left_len = max_len // 2
+            right_len = max_len - left_len
+            token_ids = token_ids[:left_len] + token_ids[-right_len:]
+        else:
+            token_ids = token_ids[:max_len]
+        return self.tokenizer.decode(token_ids)
+
+    def _obs_message(self, item: dict[str, Any]) -> str:
+        return f"<obs>{self._truncate_tool_response(item['tool_response'])}</obs>"
+
+    def _obs_record(self, item: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "role": "user",
+            "content": self._obs_message(item),
+            "obs": [
+                {
+                    "tool_call_id": item["tool_call_id"],
+                    "results": item.get("result"),
+                }
+            ],
+        }
 
     @staticmethod
     def _system_message(messages: list[dict[str, Any]]) -> dict[str, str]:
@@ -359,6 +459,21 @@ class ToolAgentLoop(AgentLoopBase):
             return json.loads(tool_response)
         except Exception:
             return tool_response
+
+    @staticmethod
+    def _selected_product_ids(snapshot) -> set[str]:
+        state = snapshot.state if snapshot is not None and isinstance(snapshot.state, dict) else {}
+        return {
+            str(product.get("product_id"))
+            for product in state.get("selected_products", [])
+            if isinstance(product, dict) and product.get("product_id") is not None
+        }
+
+    @staticmethod
+    def _budget_product_ids(snapshot) -> set[str]:
+        state = snapshot.state if snapshot is not None and isinstance(snapshot.state, dict) else {}
+        ids = state.get("budget_product_ids") or []
+        return {str(product_id) for product_id in ids if product_id is not None}
 
     @staticmethod
     def _unique_tool_call_id(name: str, parameters: dict[str, Any], used_ids: set[str]) -> str:
@@ -430,6 +545,26 @@ class ToolAgentLoop(AgentLoopBase):
     ) -> dict[str, Any] | None:
         allowed_tools = snapshot.include_tools
         tool_names = {call["name"] for call in all_calls}
+        if snapshot.state_name == STATE_CANDIDATE_SELECT and "budget_check" in tool_names:
+            if "view_product_information" not in tool_names:
+                return {
+                    "error": "budget_check_requires_view_product_information_in_select",
+                    "tool": tool_call["name"],
+                }
+            view_ids = []
+            budget_ids = []
+            for call in all_calls:
+                if call["name"] == "view_product_information":
+                    view_ids.extend(cls._parse_product_ids_param(call.get("parameters", {}).get("product_ids")))
+                elif call["name"] == "budget_check":
+                    budget_ids.extend(cls._parse_product_ids_param(call.get("parameters", {}).get("product_ids")))
+            if view_ids and budget_ids and set(view_ids) != set(budget_ids):
+                return {
+                    "error": "view_and_budget_product_ids_must_match",
+                    "tool": tool_call["name"],
+                    "view_product_ids": view_ids,
+                    "budget_product_ids": budget_ids,
+                }
         if cls._is_decision_tool_set(allowed_tools):
             if "find_product" in tool_names and bool({"recommend_product", "terminate"} & tool_names):
                 return {
@@ -447,6 +582,49 @@ class ToolAgentLoop(AgentLoopBase):
                     return {
                         "error": "recommend_product_requires_terminate_in_decision",
                         "tool": tool_call["name"],
+                    }
+            if tool_call["name"] == "terminate":
+                status = (tool_call.get("parameters") or {}).get("status")
+                if status != "success":
+                    return {
+                        "error": "terminate_status_must_be_success",
+                        "tool": tool_call["name"],
+                    }
+                expected_ids = cls._budget_product_ids(snapshot) or cls._selected_product_ids(snapshot)
+                recommend_calls = [call for call in all_calls if call["name"] == "recommend_product"]
+                if len(recommend_calls) != 1:
+                    return {
+                        "error": "terminate_requires_exactly_one_recommend_product_in_same_turn",
+                        "tool": tool_call["name"],
+                        "recommend_product_call_count": len(recommend_calls),
+                    }
+                if recommend_calls:
+                    recommended_ids = set(
+                        cls._parse_product_ids_param((recommend_calls[0].get("parameters") or {}).get("product_ids"))
+                    )
+                    if not recommended_ids or (expected_ids and recommended_ids != expected_ids):
+                        return {
+                            "error": "terminate_requires_valid_recommend_product_in_same_turn",
+                            "tool": tool_call["name"],
+                            "recommended_product_ids": sorted(recommended_ids),
+                            "expected_product_ids": sorted(expected_ids),
+                        }
+            if tool_call["name"] == "recommend_product":
+                recommended_ids = set(cls._parse_product_ids_param((tool_call.get("parameters") or {}).get("product_ids")))
+                selected_ids = cls._selected_product_ids(snapshot)
+                budget_ids = cls._budget_product_ids(snapshot)
+                expected_ids = budget_ids or selected_ids
+                if not recommended_ids:
+                    return {
+                        "error": "recommend_product_requires_product_ids",
+                        "tool": tool_call["name"],
+                    }
+                if expected_ids and recommended_ids != expected_ids:
+                    return {
+                        "error": "recommend_product_ids_must_match_verified_selection",
+                        "tool": tool_call["name"],
+                        "recommended_product_ids": sorted(recommended_ids),
+                        "expected_product_ids": sorted(expected_ids),
                     }
         if tool_call["name"] not in allowed_tools:
             return {
@@ -475,8 +653,22 @@ class ToolAgentLoop(AgentLoopBase):
     def _is_error_result(result) -> bool:
         return isinstance(result, dict) and "error" in result
 
-    async def _call_tool(self, tool_call: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def _is_successful_terminate(item: dict[str, Any]) -> bool:
+        if item.get("name") != "terminate":
+            return False
+        result = item.get("result")
+        return (
+            isinstance(result, dict)
+            and result.get("status") == "success"
+            and result.get("_tool_success") is True
+        )
+
+    async def _call_tool(self, tool_call: dict[str, Any], snapshot=None) -> dict[str, Any]:
         """Call tool and return tool response."""
+        if tool_call["name"] == "budget_check":
+            return self._budget_check_response(tool_call, snapshot)
+
         tool, instance_id = None, None
         try:
             # TODO: append malformed tool_call to the prompt: invalid function name or arguments
@@ -499,6 +691,131 @@ class ToolAgentLoop(AgentLoopBase):
             "parameters": tool_call["parameters"],
             "tool_response": tool_response,
             "result": self._parse_tool_response(tool_response),
+        }
+
+    @staticmethod
+    def _parse_product_ids_param(value) -> list[str]:
+        if isinstance(value, list):
+            return [str(item) for item in value if item not in (None, "")]
+        if isinstance(value, str):
+            return [part.strip() for part in value.split(",") if part.strip()]
+        return []
+
+    @staticmethod
+    def _float_or_none(value):
+        try:
+            return float(value)
+        except Exception:
+            return None
+
+    @classmethod
+    def _products_for_budget_check(cls, product_ids: list[str], snapshot) -> tuple[list[dict[str, Any]], dict | None]:
+        state = snapshot.state if snapshot is not None and isinstance(snapshot.state, dict) else {}
+        products_by_id = {}
+        for product in state.get("candidate_pool") or []:
+            if isinstance(product, dict) and product.get("product_id") is not None:
+                products_by_id[str(product["product_id"])] = product
+        missing = [product_id for product_id in product_ids if product_id not in products_by_id]
+        if missing:
+            return [], {"error": "budget_check_product_ids_not_in_candidate_pool", "missing_product_ids": missing}
+        products = [products_by_id[product_id] for product_id in product_ids]
+        if len(product_ids) != len(set(product_ids)):
+            return [], {"error": "budget_check_duplicate_product_ids"}
+        for product in products:
+            if cls._float_or_none(product.get("price")) is None or product.get("shop_id") is None:
+                return [], {"error": "budget_check_missing_price_or_shop_id"}
+        return products, None
+
+    @classmethod
+    def _compute_voucher_discount(cls, products: list[dict[str, Any]], voucher: dict[str, Any]) -> tuple[float, bool, dict | None]:
+        if not isinstance(voucher, dict):
+            voucher = {"type": "none"}
+        voucher_type = str(voucher.get("type", "none")).lower()
+        if voucher_type in {"none", "no_voucher", "null"}:
+            return 0.0, False, None
+
+        prices = [float(product["price"]) for product in products]
+        total = sum(prices)
+        scope_shop_id = voucher.get("scope_shop_id") or voucher.get("shop_id")
+        if "shop" in voucher_type or scope_shop_id:
+            if scope_shop_id is None:
+                selected_shops = {str(product.get("shop_id")) for product in products}
+                if len(selected_shops) != 1:
+                    return 0.0, False, {"error": "shop_voucher_requires_single_shop_or_scope_shop_id"}
+                scope_shop_id = next(iter(selected_shops))
+            eligible_total = sum(
+                float(product["price"])
+                for product in products
+                if str(product.get("shop_id")) == str(scope_shop_id)
+            )
+        else:
+            eligible_total = total
+
+        threshold = cls._float_or_none(voucher.get("threshold"))
+        if threshold is not None and eligible_total + 1e-9 < threshold:
+            return 0.0, False, None
+
+        discount = cls._float_or_none(voucher.get("discount"))
+        if discount is None:
+            discount = cls._float_or_none(voucher.get("amount"))
+        if discount is None:
+            discount = cls._float_or_none(voucher.get("value"))
+        rate = cls._float_or_none(voucher.get("rate"))
+        cap = cls._float_or_none(voucher.get("cap"))
+        if rate is not None:
+            if rate > 1:
+                rate = rate / 100.0
+            discount = eligible_total * rate
+            if cap is not None:
+                discount = min(discount, cap)
+        if discount is None:
+            return 0.0, False, {"error": "unsupported_voucher_schema"}
+        discount = max(0.0, min(float(discount), eligible_total))
+        return discount, discount > 0, None
+
+    def _budget_check_response(self, tool_call: dict[str, Any], snapshot) -> dict[str, Any]:
+        parameters = tool_call.get("parameters") or {}
+        product_ids = self._parse_product_ids_param(parameters.get("product_ids"))
+        products, error = self._products_for_budget_check(product_ids, snapshot)
+        if error is None and not product_ids:
+            error = {"error": "budget_check_requires_product_ids"}
+
+        if error is None:
+            voucher = parameters.get("voucher") or {"type": "none"}
+            discount, voucher_used, error = self._compute_voucher_discount(products, voucher)
+        if error is None and self._float_or_none(parameters.get("budget")) is None:
+            error = {"error": "budget_check_requires_numeric_budget"}
+
+        if error is not None:
+            result = {
+                **error,
+                "_tool_success": False,
+                "_parse_ok": True,
+            }
+        else:
+            budget = self._float_or_none(parameters.get("budget"))
+            total = round(sum(float(product["price"]) for product in products), 2)
+            payable_total = round(max(0.0, total - discount), 2)
+            result = {
+                "product_ids": product_ids,
+                "shop_ids": [str(product.get("shop_id")) for product in products],
+                "total_before_voucher": total,
+                "voucher_used": bool(voucher_used),
+                "voucher_applied": bool(voucher_used),
+                "payable_total": payable_total,
+                "budget": budget,
+                "within_budget": payable_total <= budget,
+                "agent_voucher": parameters.get("voucher") or {"type": "none"},
+                "_tool_success": True,
+                "_parse_ok": True,
+            }
+        tool_response = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+        return {
+            "tool_call_id": tool_call["tool_call_id"],
+            "name": tool_call["name"],
+            "parameters": parameters,
+            "tool_response": tool_response,
+            "result": result,
         }
 
     @classmethod

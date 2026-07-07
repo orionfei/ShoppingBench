@@ -54,6 +54,17 @@ def python_calc(call_id: str, payload: dict):
     )
 
 
+def budget_check(call_id: str, payload: dict):
+    return (
+        {
+            "name": "budget_check",
+            "parameters": {"product_ids": payload.get("product_ids", []), "voucher": {"type": "none"}, "budget": payload.get("budget", 0)},
+            "tool_call_id": call_id,
+        },
+        {"tool_call_id": call_id, "results": {**payload, "_tool_success": True, "_parse_ok": True}},
+    )
+
+
 def assert_state(history: list[str], expected: str, label: str):
     snapshot = build_harness_snapshot(history)
     assert snapshot.state_name == expected, (
@@ -281,6 +292,61 @@ def main() -> None:
     )
     seq.append(step([py_call], [py_obs]))
     assert_state(seq, "DECISION", "sequential SELECT view then python")
+
+    budget_tool_history = [user("Need black earbuds")]
+    call, obs = find(
+        "btq",
+        "black earbuds",
+        [{"product_id": "p1", "shop_id": "shop1", "title": "Black earbuds", "price": 120, "service": []}],
+    )
+    budget_tool_history.append(step([call], [obs]))
+    view_call, view_obs = view(
+        "btv",
+        "p1",
+        [{"product_id": "p1", "sku_options": {}, "attributes": {"Color": "Black"}, "service": []}],
+    )
+    budget_call, budget_obs = budget_check(
+        "btc",
+        {
+            "product_ids": ["p1"],
+            "shop_ids": ["shop1"],
+            "total_before_voucher": 120,
+            "voucher_used": False,
+            "payable_total": 120,
+            "budget": 130,
+            "within_budget": True,
+        },
+    )
+    budget_tool_history.append(step([view_call, budget_call], [view_obs, budget_obs]))
+    assert_state(budget_tool_history, "DECISION", "SELECT->DECISION with budget_check")
+
+    legacy_disabled = [user("Need black earbuds")]
+    call, obs = find(
+        "ldq",
+        "black earbuds",
+        [{"product_id": "p1", "shop_id": "shop1", "title": "Black earbuds", "price": 120, "service": []}],
+    )
+    legacy_disabled.append(step([call], [obs]))
+    view_call, view_obs = view(
+        "ldv",
+        "p1",
+        [{"product_id": "p1", "sku_options": {}, "attributes": {"Color": "Black"}, "service": []}],
+    )
+    py_call, py_obs = python_calc(
+        "ldpy",
+        {
+            "product_ids": ["p1"],
+            "shop_ids": ["shop1"],
+            "total_before_voucher": 120,
+            "voucher_used": True,
+            "payable_total": 100,
+            "budget": 110,
+            "within_budget": True,
+        },
+    )
+    legacy_disabled.append(step([view_call, py_call], [view_obs, py_obs]))
+    snapshot = build_harness_snapshot(legacy_disabled, allow_legacy_python_budget=False)
+    assert snapshot.state_name == "CANDIDATE_SELECT", "legacy python budget must be ignored when disabled"
 
     mismatch = [user("Need black earbuds")]
     call, obs = find(

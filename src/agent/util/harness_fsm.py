@@ -169,6 +169,24 @@ def _parse_python_result(results):
         }
 
 
+def _parse_budget_result(record: dict, *, allow_legacy_python_budget: bool = True):
+    if not isinstance(record, dict):
+        return None
+    if record.get("name") == "python_execute":
+        if not allow_legacy_python_budget:
+            return None
+        return _parse_python_result(record.get("results"))
+    if record.get("name") != "budget_check":
+        return None
+    results = record.get("results")
+    if not isinstance(results, dict):
+        return None
+    parsed = dict(results)
+    parsed.setdefault("_tool_success", not bool(parsed.get("error")))
+    parsed.setdefault("_parse_ok", "error" not in parsed)
+    return parsed
+
+
 def _nonempty_find_results(results) -> bool:
     return isinstance(results, list) and len(results) > 0
 
@@ -340,8 +358,8 @@ def _valid_view_record(record: dict) -> bool:
     )
 
 
-def _valid_python_record(record: dict) -> bool:
-    parsed = _parse_python_result(record.get("results"))
+def _valid_budget_record(record: dict, *, allow_legacy_python_budget: bool = True) -> bool:
+    parsed = _parse_budget_result(record, allow_legacy_python_budget=allow_legacy_python_budget)
     return _valid_budget_calculation(parsed)
 
 
@@ -432,7 +450,7 @@ def _active_candidate_ids_for_check(turns: list[dict], checks: list[dict], curre
     return {str(product_id) for product_id in active_ids if product_id is not None}
 
 
-def _valid_checks_from_turns(turns: list[dict]) -> list[dict]:
+def _valid_checks_from_turns(turns: list[dict], *, allow_legacy_python_budget: bool = True) -> list[dict]:
     checks = []
     latest_nonempty_find_idx = -1
     accumulated_view_records = []
@@ -455,11 +473,11 @@ def _valid_checks_from_turns(turns: list[dict]) -> list[dict]:
             accumulated_view_records.extend(turn_view_records)
 
         for record in turn.get("records", []):
-            if not _valid_python_record(record) or not accumulated_view_records:
+            if not _valid_budget_record(record, allow_legacy_python_budget=allow_legacy_python_budget) or not accumulated_view_records:
                 continue
             if max(item["turn_index"] for item in accumulated_view_records) <= latest_nonempty_find_idx:
                 continue
-            parsed_budget = _parse_python_result(record.get("results"))
+            parsed_budget = _parse_budget_result(record, allow_legacy_python_budget=allow_legacy_python_budget)
             candidate_ids = _active_candidate_ids_for_check(turns, checks, idx)
             products_by_id = {
                 product_id: product
@@ -502,8 +520,8 @@ def _valid_checks_from_turns(turns: list[dict]) -> list[dict]:
     return checks
 
 
-def _find_latest_valid_check(turns: list[dict]) -> dict | None:
-    checks = _valid_checks_from_turns(turns)
+def _find_latest_valid_check(turns: list[dict], *, allow_legacy_python_budget: bool = True) -> dict | None:
+    checks = _valid_checks_from_turns(turns, allow_legacy_python_budget=allow_legacy_python_budget)
     return checks[-1] if checks else None
 
 
@@ -532,6 +550,8 @@ def _decision_state_from_check(
     turns: list[dict],
     check: dict,
     failed_retry_records: list[dict],
+    *,
+    allow_legacy_python_budget: bool = True,
 ) -> dict:
     selected_ids = check["view_requested_product_ids"]
     products_by_id = _collect_products_by_id(turns[: check["end_turn_index"] + 1])
@@ -548,7 +568,10 @@ def _decision_state_from_check(
         if product_id is not None:
             viewed_by_id[str(product_id)] = viewed
 
-    budget_calculation = _parse_python_result(check["python_record"].get("results")) or {}
+    budget_calculation = _parse_budget_result(
+        check["python_record"],
+        allow_legacy_python_budget=allow_legacy_python_budget,
+    ) or {}
     selected_shop_ids = sorted(
         {
             str(product.get("shop_id"))
@@ -592,7 +615,7 @@ def _search_trace_from_turns(turns: list[dict]) -> list[dict]:
                     "empty": _empty_find_results(results),
                 }
             )
-        if "view_product_information" in names and "python_execute" in names:
+        if "view_product_information" in names and bool({"python_execute", "budget_check"} & names):
             current_phase = STATE_DECISION
         elif any(
             record.get("name") == "find_product" and _nonempty_find_results(record.get("results"))
@@ -605,6 +628,8 @@ def _search_trace_from_turns(turns: list[dict]) -> list[dict]:
 def build_harness_snapshot(
     history_messages: list[str],
     prompt_files: dict[str, str] | None = None,
+    *,
+    allow_legacy_python_budget: bool = True,
 ) -> HarnessSnapshot:
     prompt_files = {**DEFAULT_PROMPT_FILES, **(prompt_files or {})}
     turns = _build_turns(history_messages)
@@ -615,7 +640,7 @@ def build_harness_snapshot(
         state = {}
         return HarnessSnapshot(state_name, state, prompt_files[state_name], STATE_TOOLS[state_name], search_trace)
 
-    valid_checks = _valid_checks_from_turns(turns)
+    valid_checks = _valid_checks_from_turns(turns, allow_legacy_python_budget=allow_legacy_python_budget)
     latest_check = valid_checks[-1] if valid_checks else None
     latest_check_end_idx = latest_check["end_turn_index"] if latest_check else None
     latest_nonempty_find_idx = None
@@ -665,7 +690,12 @@ def build_harness_snapshot(
 
     if latest_retry_nonempty_idx is not None:
         state_name = STATE_CANDIDATE_SELECT
-        previous_decision_state = _decision_state_from_check(turns, latest_check, failed_retry_records)
+        previous_decision_state = _decision_state_from_check(
+            turns,
+            latest_check,
+            failed_retry_records,
+            allow_legacy_python_budget=allow_legacy_python_budget,
+        )
         state = {
             "candidate_pool": _candidate_pool_from_turns(
                 turns,
@@ -680,7 +710,12 @@ def build_harness_snapshot(
         }
     else:
         state_name = STATE_DECISION
-        state = _decision_state_from_check(turns, latest_check, failed_retry_records)
+        state = _decision_state_from_check(
+            turns,
+            latest_check,
+            failed_retry_records,
+            allow_legacy_python_budget=allow_legacy_python_budget,
+        )
     return HarnessSnapshot(state_name, state, prompt_files[state_name], STATE_TOOLS[state_name], search_trace)
 
 
@@ -762,6 +797,195 @@ def build_harness_user_prompt_with_brief_instructions(
         + "\n\n"
         + build_harness_user_prompt(snapshot, history_messages)
     )
+
+
+def _clip_text(value, max_chars: int) -> str:
+    text = "" if value is None else str(value)
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3].rstrip() + "..."
+
+
+def _compact_candidate_row(product: dict, title_chars: int = 80) -> list:
+    return [
+        str(product.get("product_id", "")),
+        str(product.get("shop_id", "")),
+        _clip_text(product.get("title", ""), title_chars),
+        product.get("price"),
+        product.get("service", []),
+        product.get("sold_count"),
+    ]
+
+
+def _compact_selected_row(product: dict, title_chars: int = 80) -> list:
+    return [
+        str(product.get("product_id", "")),
+        str(product.get("shop_id", "")),
+        _clip_text(product.get("title", ""), title_chars),
+        product.get("price"),
+    ]
+
+
+def _compact_viewed_row(product: dict, detail_chars: int = 220) -> list:
+    detail_parts = []
+    for key in ("description", "short_description", "product_description", "sku_options", "attributes", "service"):
+        if key in product and product[key] not in (None, "", [], {}):
+            detail_parts.append(f"{key}={product[key]}")
+    return [
+        str(product.get("product_id", "")),
+        _clip_text(product.get("title", ""), 80),
+        _clip_text("; ".join(detail_parts), detail_chars),
+    ]
+
+
+def _compact_budget_result(value: dict | None) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    keep = (
+        "product_ids",
+        "shop_ids",
+        "total_before_voucher",
+        "voucher_used",
+        "payable_total",
+        "budget",
+        "within_budget",
+        "agent_voucher",
+    )
+    return {key: value[key] for key in keep if key in value}
+
+
+def _compact_parameters(parameters: dict) -> dict:
+    if not isinstance(parameters, dict):
+        return {}
+    result = {}
+    for key, value in parameters.items():
+        if key == "code":
+            continue
+        if isinstance(value, str):
+            result[key] = _clip_text(value, 120)
+        elif isinstance(value, (int, float, bool)) or value is None:
+            result[key] = value
+        elif isinstance(value, list):
+            result[key] = value[:10]
+        elif isinstance(value, dict):
+            result[key] = {
+                str(sub_key): (_clip_text(sub_value, 80) if isinstance(sub_value, str) else sub_value)
+                for sub_key, sub_value in list(value.items())[:10]
+            }
+    return result
+
+
+def _latest_structured_errors(history_messages: list[str], max_errors: int = 3) -> list[dict]:
+    for item in reversed(history_messages):
+        calls = _json_role_value(item, "tool_call")
+        obs = _json_role_value(item, "obs")
+        if not calls or not obs:
+            continue
+        if isinstance(calls, dict):
+            calls = [calls]
+        if not isinstance(calls, list) or not isinstance(obs, list):
+            continue
+        calls_by_id = {
+            call.get("tool_call_id"): call
+            for call in calls
+            if isinstance(call, dict)
+        }
+        errors = []
+        for observation in obs:
+            if not isinstance(observation, dict):
+                continue
+            result = observation.get("results")
+            if not isinstance(result, dict):
+                continue
+            error = result.get("error")
+            if not error and result.get("_tool_success") is not False:
+                continue
+            call = calls_by_id.get(observation.get("tool_call_id"), {})
+            errors.append(
+                {
+                    "tool": call.get("name"),
+                    "error": _clip_text(error or "tool_success_false", 120),
+                    "parameters": _compact_parameters(call.get("parameters", {})),
+                }
+            )
+        return errors[-max_errors:] if errors else []
+    return []
+
+
+def _compact_state_payload(
+    snapshot: HarnessSnapshot,
+    *,
+    max_candidates: int | None = None,
+    max_failed_searches: int | None = 5,
+    max_viewed_products: int | None = None,
+) -> dict:
+    state = snapshot.state if isinstance(snapshot.state, dict) else {}
+    payload = {
+        "state": snapshot.state_name,
+        "allowed_tools": sorted(snapshot.include_tools),
+    }
+    if snapshot.state_name == STATE_CANDIDATE_SEARCH:
+        failed = state.get("failed_searches") or []
+        payload["failed_searches"] = failed[-max_failed_searches:] if max_failed_searches else failed
+    elif snapshot.state_name == STATE_CANDIDATE_SELECT:
+        candidates = state.get("candidate_pool") or []
+        if max_candidates:
+            candidates = candidates[:max_candidates]
+        payload["candidate_pool"] = [_compact_candidate_row(item) for item in candidates if isinstance(item, dict)]
+        previous = state.get("previous_decision")
+        if isinstance(previous, dict):
+            viewed = previous.get("viewed_products") or []
+            if max_viewed_products:
+                viewed = viewed[:max_viewed_products]
+            payload["previous_decision"] = {
+                "selected_products": [
+                    _compact_selected_row(item)
+                    for item in previous.get("selected_products", [])
+                    if isinstance(item, dict)
+                ],
+                "viewed_products": [_compact_viewed_row(item) for item in viewed if isinstance(item, dict)],
+                "budget_result": _compact_budget_result(previous.get("budget_calculation")),
+            }
+    else:
+        viewed = state.get("viewed_products") or []
+        if max_viewed_products:
+            viewed = viewed[:max_viewed_products]
+        failed = state.get("failed_retry_searches") or []
+        payload.update(
+            {
+                "selected_products": [
+                    _compact_selected_row(item)
+                    for item in state.get("selected_products", [])
+                    if isinstance(item, dict)
+                ],
+                "viewed_products": [_compact_viewed_row(item) for item in viewed if isinstance(item, dict)],
+                "budget_result": _compact_budget_result(state.get("budget_calculation")),
+                "failed_retry_searches": failed[-max_failed_searches:] if max_failed_searches else failed,
+            }
+        )
+    return payload
+
+
+def build_compact_harness_user_prompt(
+    snapshot: HarnessSnapshot,
+    history_messages: list[str],
+    *,
+    max_candidates: int | None = None,
+    max_failed_searches: int | None = 5,
+    max_viewed_products: int | None = None,
+) -> str:
+    payload = _compact_state_payload(
+        snapshot,
+        max_candidates=max_candidates,
+        max_failed_searches=max_failed_searches,
+        max_viewed_products=max_viewed_products,
+    )
+    payload["query"] = _first_user_message(history_messages)
+    latest_errors = _latest_structured_errors(history_messages)
+    if latest_errors:
+        payload["last_errors"] = latest_errors
+    text = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return f"<state>{text}</state>"
 
 
 def search_trace_markdown(query: str, search_trace: list[dict]) -> str:
