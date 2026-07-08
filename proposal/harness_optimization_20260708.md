@@ -327,3 +327,20 @@ Search recall ablation:
 - Stage reward: `data/tmp/state_local_retry2final_s10_broad16_stage_reward_audit_20260708.json`
 - Result: success `9/16`, average steps `4.5625`, stage progress `0.6859`.
 - Decision: do not use. Keep `max_steps=15` for now; the kept retry2-final gate lowers actual average trajectory length without reducing the rollout cap.
+
+## Config Experiment: max_failed_searches=3
+
+- Hypothesis: reducing retained failed-search history from `5` to `3` may shorten state payloads for RL memory/context without changing successful trajectories.
+- Change: no code change; run current retry2-final harness with `--max-failed-searches 3`.
+- Rollout: `data/tmp/state_local_mfs3_remote_gpt55medium_broad16_w16_s15_20260708_rollout.jsonl`
+- Runner report: `data/tmp/state_local_mfs3_remote_gpt55medium_broad16_w16_s15_20260708_report.json`
+- Stage reward: `data/tmp/state_local_mfs3_broad16_stage_reward_audit_20260708.json`
+- Filtered report: `data/tmp/state_local_mfs3_broad16_stage_reward_filtered_20260708.json`
+- Result:
+  - Hard success: `10/16`, same as baseline.
+  - Average steps: `4.9375`, worse than retry2-final baseline `4.1875`.
+  - Stage progress: `0.7365`, worse than baseline `0.7416`.
+  - Tool validity: `0.996875`, worse than baseline `1.0`.
+  - Runner errors: `repeated_search_not_allowed:1`.
+  - Filtered kept rows: `10/14`, average steps `4.7857`, with one `protocol_invalid` kept failure.
+- Decision: do not use. Keep `max_failed_searches=5`; truncating failed-search history made repeated-search control weaker and lengthened trajectories.
