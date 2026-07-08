@@ -1,0 +1,16 @@
+{
+  "purpose": "Cases excluded from harness-optimization decisions because the observed failure is likely dominated by query/gold semantic mismatch rather than state-local harness behavior.",
+  "scope": "data/tmp/state_local_broad16_20260707.jsonl with gpt-5.5-medium retry2-final rollout",
+  "skip_cases": [
+    {
+      "idx": 7,
+      "label": "query_gold_semantic_mismatch",
+      "reason": "The query asks for beige/white girls shoes, while the gold shoe title indicates a black color variant."
+    },
+    {
+      "idx": 13,
+      "label": "query_gold_semantic_mismatch",
+      "reason": "The query asks for a black travel shaver, while the gold product is a professional hair clipper/trimmer; the model-selected portable shaver is semantically plausible but reward-wrong."
+    }
+  ]
+}

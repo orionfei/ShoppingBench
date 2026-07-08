@@ -37,9 +37,12 @@ from util.harness_fsm import (  # noqa: E402
     STATE_CANDIDATE_SELECT,
     build_harness_snapshot,
     build_compact_harness_user_prompt,
+    decision_ready_to_recommend,
     is_duplicate_find_product_in_turn,
     is_repeated_failed_search,
     is_repeated_search,
+    previous_shop_voucher_selection_issue,
+    shop_voucher_selection_issue,
 )
 from util.message import ASSISTANT_ROLES, USER_ROLES, Message, generate_tool_call_id  # noqa: E402
 from util.system_prompt import build_system_prompt  # noqa: E402
@@ -265,8 +268,17 @@ class ToolAgentLoop(AgentLoopBase):
             assistant_text = await self.loop.run_in_executor(None, self.tokenizer.decode, response_ids)
             assistant_record = {"role": "assistant", "content": assistant_text}
             tool_block_error = self._tool_block_validation_error(assistant_text)
-            tool_json_error = None if tool_block_error else self._tool_call_json_validation_error(assistant_text)
-            if tool_block_error or tool_json_error:
+            tool_json_error = (
+                None
+                if tool_block_error and not self._is_recoverable_tool_block_error(tool_block_error)
+                else self._tool_call_json_validation_error(assistant_text)
+            )
+            tool_calls = None
+            recovered_tool_block_error = False
+            if tool_block_error and self._is_recoverable_tool_block_error(tool_block_error) and tool_json_error is None:
+                tool_calls = await self.tool_parser.extract_tool_calls(response_ids)
+                recovered_tool_block_error = bool(tool_calls)
+            if (tool_block_error or tool_json_error) and not recovered_tool_block_error:
                 error_response = self._format_error_response(tool_block_error or tool_json_error)
                 rollout_messages.append(assistant_record)
                 history_messages.append(self._format_error_history_message(error_response))
@@ -291,7 +303,8 @@ class ToolAgentLoop(AgentLoopBase):
                 user_turns += 1
                 continue
 
-            tool_calls = await self.tool_parser.extract_tool_calls(response_ids)
+            if tool_calls is None:
+                tool_calls = await self.tool_parser.extract_tool_calls(response_ids)
             if not tool_calls:
                 error_response = self._format_error_response({"error": "no_valid_tool_call"})
                 rollout_messages.append(assistant_record)
@@ -327,8 +340,9 @@ class ToolAgentLoop(AgentLoopBase):
             tasks = []
             task_indices = []
             tool_responses: list[dict[str, Any] | None] = [None] * len(normalized_calls)
+            execution_block_error = None if recovered_tool_block_error else tool_block_error
             for idx, tool_call in enumerate(normalized_calls):
-                validation_error = tool_block_error
+                validation_error = execution_block_error
                 if validation_error is None and self.max_parallel_calls and idx >= self.max_parallel_calls:
                     validation_error = {
                         "error": "too_many_parallel_calls",
@@ -410,6 +424,12 @@ class ToolAgentLoop(AgentLoopBase):
     def _state_local_snapshot(self, snapshot):
         if snapshot.state_name == STATE_CANDIDATE_SELECT:
             snapshot.include_tools = {"view_product_information", "budget_check"}
+            if previous_shop_voucher_selection_issue(snapshot):
+                snapshot.include_tools.add("find_product")
+        elif decision_ready_to_recommend(snapshot):
+            snapshot.include_tools = {"recommend_product", "terminate"}
+        elif shop_voucher_selection_issue(snapshot):
+            snapshot.include_tools = {"find_product"}
         max_failed = self.state_max_searches or 5
         if isinstance(snapshot.state, dict) and max_failed:
             if "failed_searches" in snapshot.state:
@@ -617,8 +637,8 @@ class ToolAgentLoop(AgentLoopBase):
         return message.to_string(ASSISTANT_ROLES)
 
     @staticmethod
-    def _is_decision_tool_set(allowed_tools: set[str]) -> bool:
-        return {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools)
+    def _allows_decision_final_tools(allowed_tools: set[str]) -> bool:
+        return {"recommend_product", "terminate"}.issubset(allowed_tools)
 
     @staticmethod
     def _strip_generation_markers(text: str) -> str:
@@ -645,6 +665,18 @@ class ToolAgentLoop(AgentLoopBase):
         if not think_match or not think_match.group(1).strip():
             return {"error": "think_block_must_be_non_empty"}
         return None
+
+    @staticmethod
+    def _is_recoverable_tool_block_error(error: dict[str, Any] | None) -> bool:
+        return bool(
+            isinstance(error, dict)
+            and error.get("error")
+            in {
+                "exactly_one_think_block_required",
+                "state_local_output_must_be_think_then_tool_call_only",
+                "think_block_must_be_non_empty",
+            }
+        )
 
     @staticmethod
     def _tool_call_json_validation_error(text: str) -> dict[str, Any] | None:
@@ -760,7 +792,7 @@ class ToolAgentLoop(AgentLoopBase):
                     "budget_product_ids": budget_ids,
                     "required_fix": "Use the exact same selected product ids in view_product_information and budget_check.",
                 }
-        if cls._is_decision_tool_set(allowed_tools):
+        if snapshot.state_name == "DECISION" and cls._allows_decision_final_tools(allowed_tools):
             if "find_product" in tool_names and bool({"recommend_product", "terminate"} & tool_names):
                 return {
                     "error": "mixed_decision_actions_not_allowed",

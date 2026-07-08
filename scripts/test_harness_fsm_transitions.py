@@ -14,9 +14,12 @@ if str(AGENT_SRC) not in sys.path:
 from util.harness_fsm import (  # noqa: E402
     build_compact_harness_user_prompt,
     build_harness_snapshot,
+    decision_ready_to_recommend,
     is_duplicate_find_product_in_turn,
     is_repeated_failed_search,
     is_repeated_search,
+    previous_shop_voucher_selection_issue,
+    shop_voucher_selection_issue,
 )
 from util.message import Message  # noqa: E402
 
@@ -176,6 +179,12 @@ def main() -> None:
     history.append(step([view_call, py_call], [view_obs, py_obs]))
     snapshot = assert_state(history, "DECISION", "SELECT->DECISION")
     assert snapshot.state["budget_calculation"]["within_budget"] is True
+    assert not decision_ready_to_recommend(snapshot)
+    final_only_snapshot = build_harness_snapshot(history)
+    final_only_snapshot.include_tools = {"recommend_product", "terminate"}
+    compact_prompt = build_compact_harness_user_prompt(final_only_snapshot, history)
+    assert '"allowed_tools":["recommend_product","terminate"]' in compact_prompt
+    assert "Do not call find_product after a verified within-budget selection." in compact_prompt
     compact_prompt = build_compact_harness_user_prompt(snapshot, history)
     assert '"viewed_products"' in compact_prompt
     assert '"attrs":{"Type":"Earbuds"}' in compact_prompt
@@ -232,6 +241,7 @@ def main() -> None:
         {"q": "black wireless earbuds", "page": 1},
         {"q": "cheaper black wireless earbuds", "page": 1}
     ]
+    assert decision_ready_to_recommend(snapshot)
 
     stale_candidate = [user("Need black wireless earbuds")]
     call, obs = find(
@@ -305,6 +315,23 @@ def main() -> None:
     snapshot = assert_state(multi, "CANDIDATE_SELECT", "multiple non-empty search batches")
     assert {item["product_id"] for item in snapshot.state["candidate_pool"]} == {"shirt1", "pants1"}
 
+    balanced = [user("Need shirt and pants")]
+    shirt_results = [
+        {"product_id": f"shirt{i}", "shop_id": "shopA", "title": f"Blue shirt {i}", "price": 30 + i, "service": []}
+        for i in range(5)
+    ]
+    pants_results = [
+        {"product_id": f"pants{i}", "shop_id": "shopB", "title": f"Black pants {i}", "price": 40 + i, "service": []}
+        for i in range(5)
+    ]
+    c1, o1 = find("bal1", "shirt", shirt_results)
+    c2, o2 = find("bal2", "pants", pants_results)
+    balanced.append(step([c1, c2], [o1, o2]))
+    snapshot = assert_state(balanced, "CANDIDATE_SELECT", "balanced candidate truncation setup")
+    compact_prompt = build_compact_harness_user_prompt(snapshot, balanced, max_candidates=2)
+    assert '"shirt0"' in compact_prompt
+    assert '"pants0"' in compact_prompt
+
     seq = [user("Need black earbuds")]
     call, obs = find(
         "sq",
@@ -359,6 +386,64 @@ def main() -> None:
     )
     budget_tool_history.append(step([view_call, budget_call], [view_obs, budget_obs]))
     assert_state(budget_tool_history, "DECISION", "SELECT->DECISION with budget_check")
+
+    cross_shop_voucher = [user("Need two products with a shop voucher")]
+    call, obs = find(
+        "csvq",
+        "bundle",
+        [
+            {"product_id": "p1", "shop_id": "shop1", "title": "Item one", "price": 50, "service": []},
+            {"product_id": "p2", "shop_id": "shop2", "title": "Item two", "price": 60, "service": []},
+        ],
+    )
+    cross_shop_voucher.append(step([call], [obs]))
+    view_call, view_obs = view(
+        "csvv",
+        "p1,p2",
+        [
+            {"product_id": "p1", "sku_options": {}, "attributes": {}, "service": []},
+            {"product_id": "p2", "sku_options": {}, "attributes": {}, "service": []},
+        ],
+    )
+    budget_call, budget_obs = budget_check(
+        "csvb",
+        {
+            "product_ids": ["p1", "p2"],
+            "shop_ids": ["shop1", "shop2"],
+            "total_before_voucher": 110,
+            "voucher_used": False,
+            "payable_total": 110,
+            "budget": 130,
+            "within_budget": True,
+            "agent_voucher": {"type": "shop_threshold_discount", "threshold": 100, "discount": 20, "scope_shop_id": "shop1"},
+        },
+    )
+    cross_shop_voucher.append(step([view_call, budget_call], [view_obs, budget_obs]))
+    snapshot = assert_state(cross_shop_voucher, "DECISION", "cross-shop shop voucher reaches decision with issue")
+    issue = shop_voucher_selection_issue(snapshot)
+    assert issue and issue["error"] == "shop_voucher_selection_has_multiple_shops"
+    assert not decision_ready_to_recommend(snapshot)
+    compact_prompt = build_compact_harness_user_prompt(snapshot, cross_shop_voucher)
+    assert '"selection_issues"' in compact_prompt
+    assert '"required_action":"find_product"' in compact_prompt
+    retry_call, retry_obs = find(
+        "csvr",
+        "replacement",
+        [
+            {"product_id": "p3", "shop_id": "shop1", "title": "Replacement one", "price": 40, "service": ["COD"]},
+            {"product_id": "p4", "shop_id": "shop1", "title": "Replacement two", "price": 45, "service": ["freeShipping"]},
+            {"product_id": "p5", "shop_id": "shop2", "title": "Other shop", "price": 35, "service": []},
+        ],
+    )
+    cross_shop_voucher.append(step([retry_call], [retry_obs]))
+    snapshot = assert_state(cross_shop_voucher, "CANDIDATE_SELECT", "shop voucher retry returns to select")
+    issue = previous_shop_voucher_selection_issue(snapshot)
+    assert issue and issue["source"] == "previous_decision"
+    snapshot.include_tools.add("find_product")
+    compact_prompt = build_compact_harness_user_prompt(snapshot, cross_shop_voucher, max_candidates=2)
+    assert '"selection_issues"' in compact_prompt
+    assert '"candidate_shop_groups"' in compact_prompt
+    assert '"previous_searches"' in compact_prompt
 
     legacy_disabled = [user("Need black earbuds")]
     call, obs = find(

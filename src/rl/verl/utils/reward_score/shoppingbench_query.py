@@ -1056,6 +1056,28 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
     budget_success = 1.0 if semantic_set_exact_success and recommended_budget.get("within_budget") else 0.0
     terminate_after_valid_recommend = 1.0 if state["terminate_success"] and budget_success else 0.0
     final_success = 1.0 if budget_success and state["terminate_success"] else 0.0
+    if final_success:
+        structured_failure_mode = "success"
+    elif workflow_valid < 1.0:
+        structured_failure_mode = "workflow_invalid"
+    elif protocol_reward < 1.0:
+        structured_failure_mode = "protocol_invalid"
+    elif search_gold_recall < 1.0:
+        structured_failure_mode = "search_recall_gap"
+    elif not recommended_ids:
+        structured_failure_mode = "no_recommendation"
+    elif recommend_relevance_f1 < 1.0:
+        structured_failure_mode = (
+            "final_selection_after_full_recall_gap"
+            if state["terminate_success"]
+            else "selection_after_full_recall_gap"
+        )
+    elif not recommended_budget.get("within_budget"):
+        structured_failure_mode = "budget_gap"
+    elif not state["terminate_success"]:
+        structured_failure_mode = "termination_gap"
+    else:
+        structured_failure_mode = "other_failure"
 
     find_correct = min(workflow_valid, search_gold_recall)
     view_confirmed = min(find_correct, verify_relevance_f1)
@@ -1103,6 +1125,7 @@ def compute_score(solution_str, ground_truth, extra_info=None, **kwargs):
         "score": score,
         "success": final_success,
         "final_success": final_success,
+        "structured_failure_mode": structured_failure_mode,
         "format": format_valid,
         "tool_valid": tool_valid,
         "protocol": protocol_reward,

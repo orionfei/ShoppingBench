@@ -149,12 +149,15 @@ def _previous_searches_from_trace(search_trace: list[dict], max_searches: int | 
     return searches[-max_searches:] if max_searches else searches
 
 
-def _slim_candidate(product: dict) -> dict:
-    return {
+def _slim_candidate(product: dict, source_search_index=None) -> dict:
+    result = {
         key: product[key]
         for key in ("product_id", "shop_id", "title", "price", "service", "sold_count")
         if isinstance(product, dict) and key in product
     }
+    if source_search_index is not None:
+        result["_source_search_index"] = source_search_index
+    return result
 
 
 def _slim_viewed_product(product: dict) -> dict:
@@ -282,6 +285,94 @@ def _budget_product_ids(parsed_budget: dict | None) -> list[str]:
     if not isinstance(product_ids, list):
         return []
     return [str(product_id) for product_id in product_ids if product_id is not None]
+
+
+def _voucher_requires_single_shop(budget_calculation: dict | None) -> bool:
+    if not isinstance(budget_calculation, dict):
+        return False
+    voucher = budget_calculation.get("agent_voucher") or {}
+    if not isinstance(voucher, dict):
+        return False
+    voucher_type = str(voucher.get("type", "")).lower()
+    return "shop" in voucher_type or bool(voucher.get("scope_shop_id") or voucher.get("shop_id"))
+
+
+def _shop_voucher_selection_issue_from_budget(
+    budget_calculation: dict | None,
+    *,
+    selected_shop_ids: list | None = None,
+    fallback_product_ids: list | None = None,
+) -> dict | None:
+    if not _voucher_requires_single_shop(budget_calculation):
+        return None
+    shop_ids = [
+        str(shop_id)
+        for shop_id in budget_calculation.get("shop_ids") or selected_shop_ids or []
+        if shop_id not in (None, "")
+    ]
+    unique_shop_ids = sorted(set(shop_ids))
+    if len(unique_shop_ids) <= 1:
+        return None
+    return {
+        "error": "shop_voucher_selection_has_multiple_shops",
+        "product_ids": _budget_product_ids(budget_calculation) or fallback_product_ids or [],
+        "shop_ids": unique_shop_ids,
+        "scope_shop_id": (budget_calculation.get("agent_voucher") or {}).get("scope_shop_id")
+        or (budget_calculation.get("agent_voucher") or {}).get("shop_id"),
+        "required_action": "find_product",
+        "required_fix": "Search replacement candidates so the verified bundle can come from one shop before recommending.",
+    }
+
+
+def shop_voucher_selection_issue(snapshot: HarnessSnapshot) -> dict | None:
+    if snapshot.state_name != STATE_DECISION or not isinstance(snapshot.state, dict):
+        return None
+    return _shop_voucher_selection_issue_from_budget(
+        snapshot.state.get("budget_calculation"),
+        selected_shop_ids=snapshot.state.get("selected_shop_ids"),
+        fallback_product_ids=snapshot.state.get("view_requested_product_ids"),
+    )
+
+
+def previous_shop_voucher_selection_issue(snapshot: HarnessSnapshot) -> dict | None:
+    if snapshot.state_name != STATE_CANDIDATE_SELECT or not isinstance(snapshot.state, dict):
+        return None
+    previous_decision = snapshot.state.get("previous_decision")
+    if not isinstance(previous_decision, dict):
+        return None
+    issue = _shop_voucher_selection_issue_from_budget(
+        previous_decision.get("budget_calculation"),
+        selected_shop_ids=[
+            item.get("shop_id")
+            for item in previous_decision.get("selected_products", [])
+            if isinstance(item, dict)
+        ],
+        fallback_product_ids=[
+            item.get("product_id")
+            for item in previous_decision.get("selected_products", [])
+            if isinstance(item, dict)
+        ],
+    )
+    if issue:
+        issue["source"] = "previous_decision"
+    return issue
+
+
+def decision_ready_to_recommend(snapshot: HarnessSnapshot) -> bool:
+    if snapshot.state_name != STATE_DECISION or not isinstance(snapshot.state, dict):
+        return False
+    budget = snapshot.state.get("budget_calculation") or {}
+    decision_retry_search_count = sum(
+        1
+        for item in snapshot.search_trace
+        if isinstance(item, dict) and item.get("phase") == STATE_DECISION and item.get("result_count") is not None
+    )
+    return (
+        isinstance(budget, dict)
+        and budget.get("within_budget") is True
+        and decision_retry_search_count >= 2
+        and shop_voucher_selection_issue(snapshot) is None
+    )
 
 
 def _product_ids_from_products(products) -> set[str]:
@@ -443,10 +534,12 @@ def _candidate_pool_from_records(records: list[dict], seed_products: list[dict] 
         if product_id in seen_ids:
             continue
         seen_ids.add(product_id)
-        candidates.append(_slim_candidate(product))
+        candidates.append(_slim_candidate(product, source_search_index="selected"))
+    source_search_index = 0
     for record in records:
         if record.get("name") != "find_product":
             continue
+        source_search_index += 1
         results = record.get("results")
         if not isinstance(results, list):
             continue
@@ -457,7 +550,7 @@ def _candidate_pool_from_records(records: list[dict], seed_products: list[dict] 
             if product_id in seen_ids:
                 continue
             seen_ids.add(product_id)
-            candidates.append(_slim_candidate(product))
+            candidates.append(_slim_candidate(product, source_search_index=source_search_index))
     return candidates
 
 
@@ -835,20 +928,28 @@ def _brief_state_instructions(snapshot: HarnessSnapshot) -> str:
             "If the query voucher applies only to products from the same shop, group candidate_pool by shop_id first; verify a same-shop bundle or search again.",
         ]
     else:
-        rules = [
-            "Use only find_product, recommend_product, and terminate.",
-            'Every find_product call must include both "q" and integer "page"; use page 1 for a new query.',
-            'find_product service values are exact: COD, freeShipping, flashsale, official. Sort values are exact: priceasc, pricedesc, order, default.',
-            'find_product parameters: {"q": string, "page": integer}; optional keys include shop_id, price, sort, and service.',
-            'recommend_product parameters: {"product_ids": "id1,id2"}.',
-            'terminate parameters: {"status": "success"}.',
-            "In <think>, keep a short checklist with one entry per requested product and mark the missing SKU/service/attribute constraints.",
-            "If each selected product is supported by viewed_products, satisfies one requested item, and budget_result.within_budget is true, output recommend_product and terminate in the same JSON array.",
-            "If the query voucher applies only to products from the same shop, recommend only same-shop selected products.",
-            "If voucher eligibility, payable_total, budget, or within_budget is invalid or inconsistent with the user's query, output only find_product calls.",
-            "Otherwise output only find_product calls for replacement candidates; each replacement search must target one failed product need and include the concrete missing color, size, pack, model, service, or attribute.",
-            "Do not repeat exact parameters listed in failed_retry_searches.",
-        ]
+        if "find_product" in snapshot.include_tools:
+            rules = [
+                "Use only find_product, recommend_product, and terminate.",
+                'Every find_product call must include both "q" and integer "page"; use page 1 for a new query.',
+                'find_product service values are exact: COD, freeShipping, flashsale, official. Sort values are exact: priceasc, pricedesc, order, default.',
+                'find_product parameters: {"q": string, "page": integer}; optional keys include shop_id, price, sort, and service.',
+                'recommend_product parameters: {"product_ids": "id1,id2"}.',
+                'terminate parameters: {"status": "success"}.',
+                "In <think>, keep a short checklist with one entry per requested product and mark the missing SKU/service/attribute constraints.",
+                "If each selected product is supported by viewed_products, satisfies one requested item, and budget_result.within_budget is true, output recommend_product and terminate in the same JSON array.",
+                "If the query voucher applies only to products from the same shop, recommend only same-shop selected products.",
+                "If voucher eligibility, payable_total, budget, or within_budget is invalid or inconsistent with the user's query, output only find_product calls.",
+                "Otherwise output only find_product calls for replacement candidates; each replacement search must target one failed product need and include the concrete missing color, size, pack, model, service, or attribute.",
+                "Do not repeat exact parameters listed in failed_retry_searches.",
+            ]
+        else:
+            rules = [
+                "Use only recommend_product and terminate.",
+                'recommend_product parameters: {"product_ids": "id1,id2"}.',
+                'terminate parameters: {"status": "success"}.',
+                "Output recommend_product and terminate in the same JSON array using budget_result.product_ids.",
+            ]
     return "\n".join(
         [
             f"Current state: {snapshot.state_name}",
@@ -890,6 +991,76 @@ def _compact_candidate_row(product: dict, title_chars: int = 80) -> list:
         product.get("service", []),
         product.get("sold_count"),
     ]
+
+
+def _compact_candidate_shop_groups(candidates: list, max_groups: int = 6, max_product_ids: int = 8) -> list[dict]:
+    groups = {}
+    order = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        shop_id = candidate.get("shop_id")
+        if shop_id in (None, ""):
+            continue
+        shop_id = str(shop_id)
+        if shop_id not in groups:
+            groups[shop_id] = []
+            order.append(shop_id)
+        groups[shop_id].append(candidate)
+    ranked_shop_ids = sorted(order, key=lambda item: (-len(groups[item]), order.index(item)))
+    result = []
+    for shop_id in ranked_shop_ids[:max_groups]:
+        items = groups[shop_id]
+        services = sorted(
+            {
+                str(service)
+                for item in items
+                for service in (item.get("service") or [])
+                if service not in (None, "")
+            }
+        )
+        result.append(
+            {
+                "shop_id": shop_id,
+                "count": len(items),
+                "product_ids": [
+                    str(item.get("product_id"))
+                    for item in items[:max_product_ids]
+                    if item.get("product_id") is not None
+                ],
+                "services": services,
+            }
+        )
+    return result
+
+
+def _balanced_candidates(candidates: list, max_candidates: int | None) -> list:
+    if not max_candidates or max_candidates <= 0 or len(candidates) <= max_candidates:
+        return candidates
+    groups = []
+    group_by_source = {}
+    for idx, candidate in enumerate(candidates):
+        if not isinstance(candidate, dict):
+            continue
+        source = candidate.get("_source_search_index", idx)
+        if source not in group_by_source:
+            group_by_source[source] = []
+            groups.append(group_by_source[source])
+        group_by_source[source].append(candidate)
+    selected = []
+    offset = 0
+    while len(selected) < max_candidates:
+        added = False
+        for group in groups:
+            if offset < len(group):
+                selected.append(group[offset])
+                added = True
+                if len(selected) >= max_candidates:
+                    break
+        if not added:
+            break
+        offset += 1
+    return selected
 
 
 def _compact_selected_row(product: dict, title_chars: int = 80) -> list:
@@ -1047,21 +1218,39 @@ def _compact_state_payload(
             payload["previous_searches"] = previous
         candidates = state.get("candidate_pool") or []
         if candidates:
-            if max_candidates:
-                candidates = candidates[:max_candidates]
+            candidates = _balanced_candidates(candidates, max_candidates)
             payload["candidate_pool"] = [_compact_candidate_row(item) for item in candidates if isinstance(item, dict)]
         failed = state.get("failed_searches") or []
         payload["failed_searches"] = failed[-max_failed_searches:] if max_failed_searches else failed
     elif snapshot.state_name == STATE_CANDIDATE_SELECT:
+        selection_issue = previous_shop_voucher_selection_issue(snapshot)
         payload["action_rules"] = [
             "Choose final bundle ids only from candidate_pool when verifying.",
             "Call view_product_information and budget_check with the exact same product ids.",
             "For same-shop vouchers, group candidate_pool by shop_id first; verify a same-shop bundle or search again.",
         ]
+        if "find_product" in snapshot.include_tools:
+            payload["action_rules"].extend(
+                [
+                    'find_product requires both "q" and integer "page" when searching replacements.',
+                    'find_product service values are exact: COD, freeShipping, flashsale, official; sort values are priceasc, pricedesc, order, default.',
+                ]
+            )
+            previous_searches = _previous_searches_from_trace(snapshot.search_trace, max_failed_searches)
+            if previous_searches:
+                payload["previous_searches"] = previous_searches
+        if selection_issue:
+            payload["action_rules"].append(
+                "Do not re-submit selection_issues product_ids unless the exact selected products now have one shop_id."
+            )
         candidates = state.get("candidate_pool") or []
-        if max_candidates:
-            candidates = candidates[:max_candidates]
-        payload["candidate_pool"] = [_compact_candidate_row(item) for item in candidates if isinstance(item, dict)]
+        displayed_candidates = _balanced_candidates(candidates, max_candidates)
+        payload["candidate_pool"] = [_compact_candidate_row(item) for item in displayed_candidates if isinstance(item, dict)]
+        if selection_issue:
+            payload["selection_issues"] = [selection_issue]
+            shop_groups = _compact_candidate_shop_groups(displayed_candidates)
+            if shop_groups:
+                payload["candidate_shop_groups"] = shop_groups
         previous = state.get("previous_decision")
         if isinstance(previous, dict):
             viewed = previous.get("viewed_products") or []
@@ -1087,16 +1276,23 @@ def _compact_state_payload(
                 "budget_result": _compact_budget_result(previous.get("budget_calculation")),
             }
     else:
-        payload["action_rules"] = [
-            'find_product requires both "q" and integer "page" when searching replacements.',
-            'find_product service values are exact: COD, freeShipping, flashsale, official; sort values are priceasc, pricedesc, order, default.',
-            "In <think>, keep a short checklist with one entry per requested product and mark supported vs missing SKU/service/attribute constraints.",
-            "Recommend only if viewed_products support every requested title, service, SKU, color, size, pack, model, and attribute constraint.",
-            "If any requested SKU/attribute is missing or only approximately matched in viewed_products, search again.",
-            "Each replacement find_product call must target one failed product need and include the concrete missing color, size, pack, model, service, or attribute.",
-            "recommend_product ids must exactly match the verified budget_result product_ids and viewed_products evidence.",
-            "For same-shop vouchers, recommend only same-shop selected products.",
-        ]
+        if "find_product" in snapshot.include_tools:
+            payload["action_rules"] = [
+                'find_product requires both "q" and integer "page" when searching replacements.',
+                'find_product service values are exact: COD, freeShipping, flashsale, official; sort values are priceasc, pricedesc, order, default.',
+                "In <think>, keep a short checklist with one entry per requested product and mark supported vs missing SKU/service/attribute constraints.",
+                "Recommend only if viewed_products support every requested title, service, SKU, color, size, pack, model, and attribute constraint.",
+                "If any requested SKU/attribute is missing or only approximately matched in viewed_products, search again.",
+                "Each replacement find_product call must target one failed product need and include the concrete missing color, size, pack, model, service, or attribute.",
+                "recommend_product ids must exactly match the verified budget_result product_ids and viewed_products evidence.",
+                "For same-shop vouchers, recommend only same-shop selected products.",
+            ]
+        else:
+            payload["action_rules"] = [
+                "Use recommend_product and terminate in the same JSON array.",
+                "recommend_product ids must exactly match budget_result.product_ids.",
+                "Do not call find_product after a verified within-budget selection.",
+            ]
         viewed = state.get("viewed_products") or []
         if max_viewed_products:
             viewed = viewed[:max_viewed_products]
@@ -1124,6 +1320,9 @@ def _compact_state_payload(
                 "failed_retry_searches": failed[-max_failed_searches:] if max_failed_searches else failed,
             }
         )
+        issue = shop_voucher_selection_issue(snapshot)
+        if issue:
+            payload["selection_issues"] = [issue]
         if previous:
             payload["previous_searches"] = previous
     return payload

@@ -51,6 +51,8 @@ CORE_METRICS = [
     "steps",
 ]
 
+MODE_FIELD = "structured_failure_mode"
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -133,6 +135,8 @@ def summarize(rows: list[dict[str, Any]], group_size: int) -> dict[str, Any]:
                 summary[f"{metric}_min"] = min(vals)
                 summary[f"{metric}_max"] = max(vals)
         recommended = [str(item.get("recommended_ids") or "") for item in items]
+        mode_counts = Counter(str(item.get(MODE_FIELD) or "missing") for item in items)
+        summary["structured_failure_modes"] = dict(mode_counts)
         summary["recommended_unique"] = len(set(recommended))
         summary["recommended_nonempty_rate"] = mean([1.0 if item else 0.0 for item in recommended])
         summary["valid_rollout_count"] = sum(
@@ -156,6 +160,9 @@ def summarize(rows: list[dict[str, Any]], group_size: int) -> dict[str, Any]:
         aggregate[f"{metric}_mean"] = mean(metric_means)
         aggregate[f"{metric}_group_var_mean"] = mean(metric_vars)
     aggregate["recommended_unique_mean"] = mean([float(item["recommended_unique"]) for item in query_summaries])
+    aggregate["structured_failure_modes"] = dict(
+        sum((Counter(item.get("structured_failure_modes") or {}) for item in query_summaries), Counter())
+    )
     aggregate["recommended_nonempty_rate_mean"] = mean(
         [float(item["recommended_nonempty_rate"]) for item in query_summaries]
     )

@@ -16,6 +16,7 @@ sys.modules[spec.name] = shoppingbench_query
 spec.loader.exec_module(shoppingbench_query)
 _workflow_validity = shoppingbench_query._workflow_validity
 _has_valid_format = shoppingbench_query._has_valid_format
+compute_score = shoppingbench_query.compute_score
 
 
 def assistant(*names: str) -> dict:
@@ -39,6 +40,8 @@ def _parameters_for(name: str) -> dict:
         return {"product_ids": "p1"}
     if name == "python_execute":
         return {"code": "print('{}')"}
+    if name == "budget_check":
+        return {"product_ids": ["p1"], "voucher": {"type": "none"}, "budget": 100}
     if name == "recommend_product":
         return {"product_ids": "p1"}
     if name == "terminate":
@@ -55,6 +58,12 @@ def assert_invalid(messages: list[dict], label: str) -> None:
 
 
 def main() -> None:
+    cache_path = ROOT / "data" / "tmp" / "test_reward_empty_product_cache.json"
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text("{}\n", encoding="utf-8")
+    shoppingbench_query._product_cache.cache_clear()
+    shoppingbench_query.os.environ["SHOPPINGBENCH_PRODUCT_CACHE"] = str(cache_path)
+
     assert_valid(
         [
             assistant("find_product", "find_product"),
@@ -74,6 +83,14 @@ def main() -> None:
             assistant("recommend_product", "terminate"),
         ],
         "retry search after DECISION should be valid",
+    )
+    assert_valid(
+        [
+            assistant("find_product"),
+            assistant("view_product_information", "budget_check"),
+            assistant("recommend_product", "terminate"),
+        ],
+        "state-local budget_check workflow should be valid",
     )
 
     assert_invalid(
@@ -107,6 +124,21 @@ def main() -> None:
     assert _has_valid_format("<think>x</think><tool_call>[]</tool_call>")
     assert not _has_valid_format("<think>x</think><tool_call>[]</tool_call><tool_call>[]</tool_call>")
     assert not _has_valid_format("<think>x</think><response>a</response><response>b</response>")
+    reward = compute_score(
+        "",
+        '{"reward":[{"product_id":"p1"}],"voucher":{}}',
+        extra_info={
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": '<think>x</think><tool_call>[{"name":"find_product","parameters":{"q":"black earbuds","page":1}}]</tool_call>',
+                    "tool_call": [{"name": "find_product", "parameters": {"q": "black earbuds", "page": 1}}],
+                    "obs": [{"results": []}],
+                }
+            ]
+        },
+    )
+    assert reward["structured_failure_mode"] == "search_recall_gap"
 
     print("ShoppingBench reward workflow validity checks passed")
 

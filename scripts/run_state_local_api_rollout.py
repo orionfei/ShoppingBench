@@ -19,12 +19,16 @@ if str(AGENT_SRC) not in sys.path:
 from toolkit import toolmap  # noqa: E402
 from util.harness_fsm import (  # noqa: E402
     STATE_CANDIDATE_SELECT,
+    STATE_DECISION,
     build_compact_harness_user_prompt,
     build_harness_snapshot,
+    decision_ready_to_recommend,
     is_duplicate_find_product_in_turn,
     is_repeated_failed_search,
     is_repeated_search,
+    previous_shop_voucher_selection_issue,
     search_trace_markdown,
+    shop_voucher_selection_issue,
 )
 from util.llm import ask_llm  # noqa: E402
 from util.message import ASSISTANT_ROLES, USER_ROLES, Message, extract_json_value, generate_tool_call_id  # noqa: E402
@@ -99,6 +103,12 @@ def state_local_snapshot(history_messages: list[str], max_failed_searches: int):
     snapshot = build_harness_snapshot(history_messages, allow_legacy_python_budget=False)
     if snapshot.state_name == STATE_CANDIDATE_SELECT:
         snapshot.include_tools = {"view_product_information", "budget_check"}
+        if previous_shop_voucher_selection_issue(snapshot):
+            snapshot.include_tools.add("find_product")
+    elif decision_ready_to_recommend(snapshot):
+        snapshot.include_tools = {"recommend_product", "terminate"}
+    elif shop_voucher_selection_issue(snapshot):
+        snapshot.include_tools = {"find_product"}
     if isinstance(snapshot.state, dict) and max_failed_searches:
         if "failed_searches" in snapshot.state:
             snapshot.state["failed_searches"] = (snapshot.state.get("failed_searches") or [])[-max_failed_searches:]
@@ -360,7 +370,7 @@ def validation_error(call: dict, all_calls: list[dict], snapshot) -> dict | None
                 "budget_product_ids": budget_ids,
                 "required_fix": "Use the exact same selected product ids in view_product_information and budget_check.",
             }
-    if {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools):
+    if snapshot.state_name == STATE_DECISION and {"recommend_product", "terminate"}.issubset(allowed_tools):
         if "find_product" in names and bool({"recommend_product", "terminate"} & names):
             return {
                 "error": "mixed_decision_actions_not_allowed",
@@ -495,6 +505,14 @@ def format_error(content: str) -> str | None:
     if not think_match or not think_match.group(1).strip():
         return "think_block_must_be_non_empty"
     return None
+
+
+def is_recoverable_format_error(error: str | None) -> bool:
+    return error in {
+        "exactly_one_think_block_required",
+        "state_local_output_must_be_think_then_tool_call_only",
+        "think_block_must_be_non_empty",
+    }
 
 
 def structured_reasoning_format_error(reasoning: str, content: str) -> str | None:
@@ -648,7 +666,7 @@ def is_successful_terminate(message: Message, obs: list[dict], snapshot) -> bool
         return False
     if "recommend_product" not in {call.get("name") for call in message.tool_call or []}:
         return False
-    if not {"find_product", "recommend_product", "terminate"}.issubset(snapshot.include_tools):
+    if snapshot.state_name != STATE_DECISION or not {"recommend_product", "terminate"}.issubset(snapshot.include_tools):
         return False
     for item in obs:
         result = item.get("results")
@@ -703,6 +721,13 @@ def run_one(query: str, config: dict, system_prompt: str, trace_dir: Path) -> li
             message.format_error = "empty_model_content"
         else:
             message.format_error = format_error(content) or tool_call_json_error(content) or message.format_error or ""
+        if (
+            message.format_error
+            and is_recoverable_format_error(message.format_error)
+            and message.tool_call
+            and tool_call_json_error(content or "") is None
+        ):
+            message.format_error = ""
         if message.format_error:
             required_format = (
                 structured_reasoning_required_format()
