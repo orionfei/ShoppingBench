@@ -22,7 +22,8 @@ def load_json(path: Path):
 def find_product(base_url: str, params: dict, timeout: float = 15.0) -> list[dict]:
     query = urllib.parse.urlencode({key: value for key, value in params.items() if value not in (None, "")})
     url = f"{base_url.rstrip('/')}/find_product?{query}"
-    with urllib.request.urlopen(url, timeout=timeout) as response:
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(url, timeout=timeout) as response:
         data = json.loads(response.read().decode("utf-8"))
     return data if isinstance(data, list) else []
 

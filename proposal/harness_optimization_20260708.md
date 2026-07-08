@@ -266,10 +266,33 @@ Reward shaping direction:
 Search recall ablation:
 
 - Script: `scripts/audit_search_filter_ablations.py`
-- Output: `data/tmp/state_local_retry2final_search_filter_ablation_20260708.json`
+- Original output: `data/tmp/state_local_retry2final_search_filter_ablation_20260708.json`
+- Corrected output: `data/tmp/state_local_retry2final_search_filter_ablation_fixed_20260708.json`
 - Method: replay each failed `find_product` call and structured variants without optional filters (`service`, `shop_id`, `sort`, `price`) plus next page, then check whether missing gold product ids appear in returned tool results.
-- Result: `0/5` search-recall failures recovered any missing gold; `variant_hit_counts={}`.
-- Implication: remaining `search_recall_gap` is not caused by optional filters or page-1 truncation in a way the harness can fix generically. This supports keeping prior page-2 and candidate-expansion experiments reverted.
+- Correction: the original output was invalid because local replay requests went through a proxy and returned HTTP 403. `scripts/audit_search_filter_ablations.py` now disables proxies for local replay.
+- Corrected result: `2/5` search-recall failures recovered at least one missing gold through `next_page`; `variant_hit_counts={"next_page": 2}`.
+  - row7: recovered the tubeless tire on page 2, but row7 remains skipped due query/gold semantic mismatch on the shoe.
+  - row14: recovered the Spark 10 case on page 2, but did not recover the Vivo case.
+  - rows 3, 8, and 10 did not recover missing gold through page/filter variants.
+- Implication: page-2 is a weak, partial signal. It is not enough to justify a generic page-2 harness rule without rollout evidence, especially because prior page-2 prompting increased trajectory length.
+
+## Reverted Experiment: next-page search suggestions
+
+- Hypothesis: expose a compact `search_suggestions` field generated only from structured search trace. If a non-empty page-1 search has not tried page 2, suggest the same structured parameters with `page=2`, without parsing the user query or automatically calling tools.
+- Change tested:
+  - Added next-page suggestions to compact SEARCH/DECISION payloads.
+  - Added one DECISION action rule encouraging a relevant suggestion before another paraphrase.
+- Target sample: kept harness failures excluding skipped row7 and row13:
+  `data/tmp/state_local_kept_fail4_20260708.jsonl` (rows 3, 8, 10, 14 from broad16).
+- Rollout: `data/tmp/state_local_nextpage_remote_gpt55medium_keptfail4_w4_s15_20260708_rollout.jsonl`
+- Runner report: `data/tmp/state_local_nextpage_remote_gpt55medium_keptfail4_w4_s15_20260708_report.json`
+- Stage reward: `data/tmp/state_local_nextpage_keptfail4_stage_reward_audit_20260708.json`
+- Result:
+  - Success: `0/4`, no improvement over the baseline kept failures.
+  - Average steps: `8.0`, worse than retry2-final kept-failure baseline `5.75`.
+  - Stage progress: `0.3583`, worse than filtered kept-failure search-recall baseline `0.3721`.
+  - Format: `0.96875`, with one `exactly_one_think_block_required` error.
+- Decision: reverted. Even though fixed ablation showed page 2 can partially recover row14, exposing next-page suggestions made trajectories longer and noisier without improving success.
 
 ## Kept Experiment: retry2-final DECISION gate
 
