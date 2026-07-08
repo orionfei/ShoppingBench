@@ -24,8 +24,8 @@ PID_FILE="$LOG_DIR/pid"
 SEARCH_PID_FILE="$LOG_DIR/search_server.pid"
 MAIN_LOG="$LOG_DIR/main.log"
 
-PYTHON_BIN="${PYTHON_BIN:-/data1/yfl_data/miniconda3/envs/shoppingbench/bin/python}"
-JAVA_HOME="${JAVA_HOME:-/data1/yfl_data/miniconda3/envs/shoppingbench}"
+PYTHON_BIN="${PYTHON_BIN:-/root/miniconda3/envs/shoppingbench/bin/python}"
+JAVA_HOME="${JAVA_HOME:-/root/miniconda3/envs/shoppingbench}"
 PORT="${PORT:-5631}"
 SHOPPINGBENCH_SEARCH_CAPACITY="${SHOPPINGBENCH_SEARCH_CAPACITY:-30000}"
 NUM_QUERIES="${NUM_QUERIES:-50}"
@@ -99,11 +99,12 @@ load_runtime_env() {
   if [[ "$DISABLE_ENV_PROXY" == "1" ]]; then
     unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
   fi
-  echo "[INFO] runtime env loaded: model=${MODEL}, mimo_api_key_set=$([ -n "${MIMO_API_KEY:-}" ] && echo 1 || echo 0), mimo_base_url_set=$([ -n "${MIMO_BASE_URL:-}" ] && echo 1 || echo 0)"
+  echo "[INFO] runtime env loaded: model=${MODEL}, mimo_api_key_set=$([ -n "${MIMO_API_KEY:-}" ] && echo 1 || echo 0), mimo_base_url_set=$([ -n "${MIMO_BASE_URL:-}" ] && echo 1 || echo 0), openai_api_key_set=$([ -n "${OPENAI_API_KEY:-}" ] && echo 1 || echo 0), openai_base_url_set=$([ -n "${OPENAI_BASE_URL:-}" ] && echo 1 || echo 0)"
 }
 
 probe_search_server() {
   curl --noproxy "127.0.0.1,localhost" -fsS \
+    --max-time 5 \
     "http://127.0.0.1:${PORT}/find_product?q=test&page=1" >/dev/null 2>&1
   SEARCH_PROBE_RC=$?
   return 0
@@ -177,6 +178,7 @@ config = {
     "rollout_file": rollout_file,
     "threads": int(threads),
     "exclude_tools": ["web_search"],
+    "history_compression": "state_folded",
     "model_config": {
         "model": model,
         "temperature": float(temperature),
@@ -243,6 +245,8 @@ with sample_file.open(encoding="utf-8") as fin:
 errors = []
 format_checked_steps = 0
 tool_names = set()
+harness_states = set()
+harness_state_steps = 0
 terminated = 0
 rollout_rows = 0
 format_sft_samples = []
@@ -281,6 +285,19 @@ for rollout_idx, rollout_file in enumerate(rollout_files, 1):
         for step_idx, step in enumerate(row, 1):
             prompt = step.get("prompt")
             completion_obj = step.get("completion")
+            extra_info = step.get("extra_info") or {}
+            if extra_info.get("history_compression") != "state_folded":
+                errors.append(
+                    f"rollout {rollout_idx} row {row_idx} step {step_idx}: history_compression is not state_folded"
+                )
+            harness_state = extra_info.get("harness_state")
+            if harness_state not in {"CANDIDATE_SEARCH", "CANDIDATE_SELECT", "DECISION"}:
+                errors.append(
+                    f"rollout {rollout_idx} row {row_idx} step {step_idx}: invalid harness_state={harness_state!r}"
+                )
+            else:
+                harness_states.add(harness_state)
+                harness_state_steps += 1
             if not isinstance(prompt, list) or len(prompt) != 2:
                 errors.append(
                     f"rollout {rollout_idx} row {row_idx} step {step_idx}: prompt must contain system and user messages"
@@ -357,6 +374,8 @@ summary = {
     "format_checked_steps": format_checked_steps,
     "format_all_ok": not errors,
     "tool_names": sorted(name for name in tool_names if name),
+    "harness_states": sorted(harness_states),
+    "harness_state_steps": harness_state_steps,
     "rs_sft_samples": len(rs_samples) if isinstance(rs_samples, list) else None,
     "format_sft_samples": len(format_sft_samples),
     "errors": errors,
@@ -383,9 +402,16 @@ run_main() {
   echo "[INFO] log_dir=${LOG_DIR}"
 
   load_runtime_env
-  if [[ -z "${MIMO_API_KEY:-}" || -z "${MIMO_BASE_URL:-}" ]]; then
-    echo "[ERROR] MIMO_API_KEY/MIMO_BASE_URL must be available in the background environment" >&2
-    exit 1
+  if [[ "$MODEL" == mimo* ]]; then
+    if [[ -z "${MIMO_API_KEY:-}" || -z "${MIMO_BASE_URL:-}" ]]; then
+      echo "[ERROR] MIMO_API_KEY/MIMO_BASE_URL must be available in the background environment" >&2
+      exit 1
+    fi
+  else
+    if [[ -z "${OPENAI_API_KEY:-}" || -z "${OPENAI_BASE_URL:-}" ]]; then
+      echo "[ERROR] OPENAI_API_KEY/OPENAI_BASE_URL must be available in the background environment for non-mimo models" >&2
+      exit 1
+    fi
   fi
 
   total_start="$(date +%s)"

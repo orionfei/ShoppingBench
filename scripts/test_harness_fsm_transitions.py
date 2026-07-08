@@ -11,7 +11,13 @@ if str(ROOT) not in sys.path:
 if str(AGENT_SRC) not in sys.path:
     sys.path.insert(0, str(AGENT_SRC))
 
-from util.harness_fsm import build_harness_snapshot, is_repeated_failed_search  # noqa: E402
+from util.harness_fsm import (  # noqa: E402
+    build_compact_harness_user_prompt,
+    build_harness_snapshot,
+    is_duplicate_find_product_in_turn,
+    is_repeated_failed_search,
+    is_repeated_search,
+)
 from util.message import Message  # noqa: E402
 
 
@@ -91,6 +97,11 @@ def main() -> None:
     assert snapshot.state == {"failed_searches": [{"q": "black wireless earbuds", "page": 1}]}
     assert is_repeated_failed_search({"q": "black wireless earbuds", "page": 1}, snapshot)
     assert not is_repeated_failed_search({"q": "wireless earbuds", "page": 1}, snapshot)
+    compact_prompt = build_compact_harness_user_prompt(snapshot, history)
+    assert '"previous_searches"' in compact_prompt
+    assert '"q":"black wireless earbuds"' in compact_prompt
+    duplicate_call = {"name": "find_product", "parameters": {"q": "wireless earbuds", "page": 1}}
+    assert is_duplicate_find_product_in_turn(duplicate_call, [duplicate_call, dict(duplicate_call)])
 
     call, obs = find(
         "s1",
@@ -106,8 +117,32 @@ def main() -> None:
         ],
     )
     history.append(step([call], [obs]))
-    snapshot = assert_state(history, "CANDIDATE_SELECT", "SEARCH->SELECT")
+    snapshot = assert_state(history, "CANDIDATE_SEARCH", "first non-empty search stays SEARCH")
     assert len(snapshot.state["candidate_pool"]) == 1
+    assert "find_product" in snapshot.include_tools
+    compact_prompt = build_compact_harness_user_prompt(snapshot, history)
+    assert '"candidate_pool"' in compact_prompt
+    assert is_repeated_search({"q": "wireless earbuds", "page": 1}, snapshot)
+    assert not is_repeated_search({"q": "wireless earbuds", "page": 2}, snapshot)
+
+    call, obs = find(
+        "s2",
+        "black wireless earbuds",
+        [
+            {
+                "product_id": "p1b",
+                "shop_id": "shop1",
+                "title": "Black wireless earbuds bundle",
+                "price": 125,
+                "service": ["freeShipping"],
+            }
+        ],
+    )
+    history.append(step([call], [obs]))
+    snapshot = assert_state(history, "CANDIDATE_SELECT", "second non-empty search enters SELECT")
+    assert len(snapshot.state["candidate_pool"]) == 2
+    assert "budget_check" in snapshot.include_tools
+    assert "find_product" not in snapshot.include_tools
 
     view_call, view_obs = view(
         "v1",
@@ -141,6 +176,11 @@ def main() -> None:
     history.append(step([view_call, py_call], [view_obs, py_obs]))
     snapshot = assert_state(history, "DECISION", "SELECT->DECISION")
     assert snapshot.state["budget_calculation"]["within_budget"] is True
+    compact_prompt = build_compact_harness_user_prompt(snapshot, history)
+    assert '"viewed_products"' in compact_prompt
+    assert '"attrs":{"Type":"Earbuds"}' in compact_prompt
+    assert '"sku_options":{"Color":["Black"]}' in compact_prompt
+    assert '["p1","",120,"shop1",["freeShipping"]' in compact_prompt
 
     call, obs = find("r0", "cheaper black wireless earbuds", [])
     history.append(step([call], [obs]))
@@ -671,6 +711,27 @@ def main() -> None:
     malformed.append(step([call], [{"tool_call_id": "bad", "results": {"error": "timeout"}}]))
     snapshot = assert_state(malformed, "CANDIDATE_SEARCH", "malformed find is not empty search")
     assert snapshot.state == {}
+
+    format_feedback = [user("Need earbuds")]
+    format_feedback.append(
+        Message(
+            obs=[
+                {
+                    "tool_call_id": "format_error",
+                    "results": {
+                        "tool": "format",
+                        "error": "tool_call_items_require_exactly_name_and_parameters",
+                        "required_format": '<think>brief reasoning</think><tool_call>[{"name":"allowed_tool","parameters":{}}]</tool_call>',
+                    },
+                }
+            ]
+        ).to_string(["obs"])
+    )
+    snapshot = assert_state(format_feedback, "CANDIDATE_SEARCH", "format errors do not advance FSM")
+    compact_prompt = build_compact_harness_user_prompt(snapshot, format_feedback)
+    assert '"last_errors"' in compact_prompt
+    assert "tool_call_items_require_exactly_name_and_parameters" in compact_prompt
+    assert "required_format" in compact_prompt
 
     print("harness FSM transition checks passed")
 

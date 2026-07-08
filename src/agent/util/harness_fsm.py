@@ -22,7 +22,7 @@ DEFAULT_PROMPT_FILES = {
 
 STATE_TOOLS = {
     STATE_CANDIDATE_SEARCH: {"find_product"},
-    STATE_CANDIDATE_SELECT: {"view_product_information", "python_execute"},
+    STATE_CANDIDATE_SELECT: {"view_product_information", "budget_check"},
     STATE_DECISION: {"find_product", "recommend_product", "terminate"},
 }
 
@@ -105,6 +105,48 @@ def is_repeated_failed_search(parameters: dict, snapshot: HarnessSnapshot) -> bo
     failed_signatures = {_search_signature(item) for item in failed_searches if isinstance(item, dict)}
     signature = _search_signature(parameters)
     return bool(signature and signature in failed_signatures)
+
+
+def is_repeated_search(parameters: dict, snapshot: HarnessSnapshot) -> bool:
+    signature = _search_signature(parameters)
+    if not signature:
+        return False
+    previous_signatures = {
+        _search_signature(item.get("parameters", {}))
+        for item in snapshot.search_trace
+        if isinstance(item, dict) and item.get("result_count") is not None
+    }
+    return signature in previous_signatures
+
+
+def is_duplicate_find_product_in_turn(tool_call: dict, all_calls: list[dict]) -> bool:
+    if not isinstance(tool_call, dict) or tool_call.get("name") != "find_product":
+        return False
+    signature = _search_signature(tool_call.get("parameters", {}))
+    if not signature:
+        return False
+    count = 0
+    for call in all_calls:
+        if not isinstance(call, dict) or call.get("name") != "find_product":
+            continue
+        if _search_signature(call.get("parameters", {})) == signature:
+            count += 1
+    return count > 1
+
+
+def _previous_searches_from_trace(search_trace: list[dict], max_searches: int | None = None) -> list[dict]:
+    searches = []
+    seen = set()
+    for item in search_trace:
+        if not isinstance(item, dict) or item.get("result_count") is None:
+            continue
+        params = _sparse_search_parameters(item.get("parameters", {}))
+        signature = _search_signature(params)
+        if not signature or signature in seen:
+            continue
+        seen.add(signature)
+        searches.append(params)
+    return searches[-max_searches:] if max_searches else searches
 
 
 def _slim_candidate(product: dict) -> dict:
@@ -596,9 +638,29 @@ def _candidate_pool_from_turn(turn: dict) -> list[dict]:
     return _candidate_pool_from_records(turn.get("records", []))
 
 
+def _nonempty_find_record_count(turns: list[dict]) -> int:
+    count = 0
+    for turn in turns:
+        for record in turn.get("records", []):
+            if record.get("name") == "find_product" and _nonempty_find_results(record.get("results")):
+                count += 1
+    return count
+
+
+def _has_selection_attempt_after(turns: list[dict], start_idx: int | None) -> bool:
+    if start_idx is None:
+        return False
+    selection_tools = {"view_product_information", "budget_check", "python_execute"}
+    for turn in turns[start_idx + 1 :]:
+        if any(record.get("name") in selection_tools for record in turn.get("records", [])):
+            return True
+    return False
+
+
 def _search_trace_from_turns(turns: list[dict]) -> list[dict]:
     trace = []
     current_phase = STATE_CANDIDATE_SEARCH
+    nonempty_find_count = 0
     for turn_no, turn in enumerate(turns, 1):
         names = {record.get("name") for record in turn.get("records", [])}
         for record in turn.get("records", []):
@@ -617,10 +679,13 @@ def _search_trace_from_turns(turns: list[dict]) -> list[dict]:
             )
         if "view_product_information" in names and bool({"python_execute", "budget_check"} & names):
             current_phase = STATE_DECISION
-        elif any(
-            record.get("name") == "find_product" and _nonempty_find_results(record.get("results"))
-            for record in turn.get("records", [])
-        ):
+        else:
+            nonempty_find_count += sum(
+                1
+                for record in turn.get("records", [])
+                if record.get("name") == "find_product" and _nonempty_find_results(record.get("results"))
+            )
+        if current_phase == STATE_CANDIDATE_SEARCH and nonempty_find_count >= 2:
             current_phase = STATE_CANDIDATE_SELECT
     return trace
 
@@ -662,6 +727,12 @@ def build_harness_snapshot(
         if latest_nonempty_find_idx is None:
             state_name = STATE_CANDIDATE_SEARCH
             state = {}
+            failed_searches = _unique_searches(all_empty_searches)
+            if failed_searches:
+                state["failed_searches"] = failed_searches
+        elif _nonempty_find_record_count(turns) < 2 and not _has_selection_attempt_after(turns, latest_nonempty_find_idx):
+            state_name = STATE_CANDIDATE_SEARCH
+            state = {"candidate_pool": _candidate_pool_from_turns(turns)}
             failed_searches = _unique_searches(all_empty_searches)
             if failed_searches:
                 state["failed_searches"] = failed_searches
@@ -748,6 +819,7 @@ def _brief_state_instructions(snapshot: HarnessSnapshot) -> str:
     if snapshot.state_name == STATE_CANDIDATE_SEARCH:
         rules = [
             "Use only find_product.",
+            'Every find_product call must include both "q" and integer "page"; use page 1 for a new query.',
             'find_product parameters: {"q": string, "page": integer}; optional keys include shop_id, price, sort, and service.',
             "Choose queries from the user request and cover all requested product needs.",
             "Do not repeat exact parameters listed in failed_searches.",
@@ -755,23 +827,26 @@ def _brief_state_instructions(snapshot: HarnessSnapshot) -> str:
         ]
     elif snapshot.state_name == STATE_CANDIDATE_SELECT:
         rules = [
-            "Use only view_product_information and python_execute.",
+            "Use only view_product_information and budget_check.",
             'view_product_information parameters: {"product_ids": "id1,id2"}.',
-            'python_execute parameters: {"code": string}. The code must print one JSON object.',
+            'budget_check parameters: {"product_ids": [string, ...], "voucher": object, "budget": number}.',
             "Choose product ids only from candidate_pool.",
-            "Use python_execute to calculate voucher eligibility, payable_total, budget, and within_budget from the user's query, using selected ids, shop ids, and prices from candidate_pool.",
-            "The printed JSON must include product_ids, shop_ids, total_before_voucher, payable_total, budget, within_budget, and voucher_used.",
-            "The budget JSON must match candidate_pool prices and shop ids.",
+            "Use the exact same final bundle ids in view_product_information and budget_check.",
+            "If the query voucher applies only to products from the same shop, group candidate_pool by shop_id first; verify a same-shop bundle or search again.",
         ]
     else:
         rules = [
             "Use only find_product, recommend_product, and terminate.",
+            'Every find_product call must include both "q" and integer "page"; use page 1 for a new query.',
+            'find_product service values are exact: COD, freeShipping, flashsale, official. Sort values are exact: priceasc, pricedesc, order, default.',
             'find_product parameters: {"q": string, "page": integer}; optional keys include shop_id, price, sort, and service.',
             'recommend_product parameters: {"product_ids": "id1,id2"}.',
             'terminate parameters: {"status": "success"}.',
-            "If the selected products satisfy the user request, the voucher/budget calculation is correct for the user's query, and within_budget is true, output recommend_product and terminate in the same JSON array.",
+            "In <think>, keep a short checklist with one entry per requested product and mark the missing SKU/service/attribute constraints.",
+            "If each selected product is supported by viewed_products, satisfies one requested item, and budget_result.within_budget is true, output recommend_product and terminate in the same JSON array.",
+            "If the query voucher applies only to products from the same shop, recommend only same-shop selected products.",
             "If voucher eligibility, payable_total, budget, or within_budget is invalid or inconsistent with the user's query, output only find_product calls.",
-            "Otherwise output only find_product calls for replacement candidates.",
+            "Otherwise output only find_product calls for replacement candidates; each replacement search must target one failed product need and include the concrete missing color, size, pack, model, service, or attribute.",
             "Do not repeat exact parameters listed in failed_retry_searches.",
         ]
     return "\n".join(
@@ -826,15 +901,38 @@ def _compact_selected_row(product: dict, title_chars: int = 80) -> list:
     ]
 
 
-def _compact_viewed_row(product: dict, detail_chars: int = 220) -> list:
+def _compact_nested(value, *, max_items: int = 12, string_chars: int = 80):
+    if isinstance(value, str):
+        return _clip_text(value, string_chars)
+    if isinstance(value, list):
+        return [_compact_nested(item, max_items=max_items, string_chars=string_chars) for item in value[:max_items]]
+    if isinstance(value, dict):
+        return {
+            str(key): _compact_nested(sub_value, max_items=max_items, string_chars=string_chars)
+            for key, sub_value in list(value.items())[:max_items]
+        }
+    return value
+
+
+def _compact_viewed_row(product: dict, selected_by_id: dict[str, dict] | None = None, detail_chars: int = 220) -> list:
+    selected_by_id = selected_by_id or {}
+    product_id = str(product.get("product_id", ""))
+    selected = selected_by_id.get(product_id, {})
     detail_parts = []
-    for key in ("description", "short_description", "product_description", "sku_options", "attributes", "service"):
+    for key in ("description", "short_description", "product_description"):
         if key in product and product[key] not in (None, "", [], {}):
-            detail_parts.append(f"{key}={product[key]}")
+            detail_parts.append(str(product[key]))
     return [
-        str(product.get("product_id", "")),
+        product_id,
         _clip_text(product.get("title", ""), 80),
-        _clip_text("; ".join(detail_parts), detail_chars),
+        product.get("price", selected.get("price")),
+        str(product.get("shop_id", selected.get("shop_id", ""))),
+        product.get("service", selected.get("service", [])),
+        {
+            "attrs": _compact_nested(product.get("attributes", {}), max_items=16, string_chars=80),
+            "sku_options": _compact_nested(product.get("sku_options", {}), max_items=16, string_chars=80),
+            "detail": _clip_text("; ".join(detail_parts), detail_chars),
+        },
     ]
 
 
@@ -879,10 +977,12 @@ def _latest_structured_errors(history_messages: list[str], max_errors: int = 3) 
     for item in reversed(history_messages):
         calls = _json_role_value(item, "tool_call")
         obs = _json_role_value(item, "obs")
-        if not calls or not obs:
+        if not obs:
             continue
         if isinstance(calls, dict):
             calls = [calls]
+        if calls is None:
+            calls = []
         if not isinstance(calls, list) or not isinstance(obs, list):
             continue
         calls_by_id = {
@@ -901,13 +1001,24 @@ def _latest_structured_errors(history_messages: list[str], max_errors: int = 3) 
             if not error and result.get("_tool_success") is not False:
                 continue
             call = calls_by_id.get(observation.get("tool_call_id"), {})
-            errors.append(
-                {
-                    "tool": call.get("name"),
-                    "error": _clip_text(error or "tool_success_false", 120),
-                    "parameters": _compact_parameters(call.get("parameters", {})),
-                }
-            )
+            compact_error = {
+                "tool": result.get("tool") or call.get("name"),
+                "error": _clip_text(error or "tool_success_false", 120),
+                "parameters": _compact_parameters(call.get("parameters", {})),
+            }
+            for key in (
+                "allowed_tools",
+                "budget_product_ids",
+                "expected_product_ids",
+                "recommended_product_ids",
+                "required_format",
+                "required_fix",
+                "view_product_ids",
+            ):
+                if key in result:
+                    compact_error[key] = result[key]
+            if compact_error not in errors:
+                errors.append(compact_error)
         return errors[-max_errors:] if errors else []
     return []
 
@@ -925,9 +1036,28 @@ def _compact_state_payload(
         "allowed_tools": sorted(snapshot.include_tools),
     }
     if snapshot.state_name == STATE_CANDIDATE_SEARCH:
+        payload["action_rules"] = [
+            'find_product requires both "q" and integer "page"; use page 1 for a new query.',
+            'find_product service values are exact: COD, freeShipping, flashsale, official; sort values are priceasc, pricedesc, order, default.',
+            "Cover every requested product need; use separate searches for unrelated items.",
+            "If candidate_pool already contains candidates for one requested need, search only for missing product needs or missing required attributes.",
+        ]
+        previous = _previous_searches_from_trace(snapshot.search_trace, max_failed_searches)
+        if previous:
+            payload["previous_searches"] = previous
+        candidates = state.get("candidate_pool") or []
+        if candidates:
+            if max_candidates:
+                candidates = candidates[:max_candidates]
+            payload["candidate_pool"] = [_compact_candidate_row(item) for item in candidates if isinstance(item, dict)]
         failed = state.get("failed_searches") or []
         payload["failed_searches"] = failed[-max_failed_searches:] if max_failed_searches else failed
     elif snapshot.state_name == STATE_CANDIDATE_SELECT:
+        payload["action_rules"] = [
+            "Choose final bundle ids only from candidate_pool when verifying.",
+            "Call view_product_information and budget_check with the exact same product ids.",
+            "For same-shop vouchers, group candidate_pool by shop_id first; verify a same-shop bundle or search again.",
+        ]
         candidates = state.get("candidate_pool") or []
         if max_candidates:
             candidates = candidates[:max_candidates]
@@ -937,32 +1067,65 @@ def _compact_state_payload(
             viewed = previous.get("viewed_products") or []
             if max_viewed_products:
                 viewed = viewed[:max_viewed_products]
+            previous_selected = [
+                item
+                for item in previous.get("selected_products", [])
+                if isinstance(item, dict)
+            ]
+            previous_selected_by_id = {
+                str(item.get("product_id")): item
+                for item in previous_selected
+                if item.get("product_id") is not None
+            }
             payload["previous_decision"] = {
-                "selected_products": [
-                    _compact_selected_row(item)
-                    for item in previous.get("selected_products", [])
+                "selected_products": [_compact_selected_row(item) for item in previous_selected],
+                "viewed_products": [
+                    _compact_viewed_row(item, previous_selected_by_id)
+                    for item in viewed
                     if isinstance(item, dict)
                 ],
-                "viewed_products": [_compact_viewed_row(item) for item in viewed if isinstance(item, dict)],
                 "budget_result": _compact_budget_result(previous.get("budget_calculation")),
             }
     else:
+        payload["action_rules"] = [
+            'find_product requires both "q" and integer "page" when searching replacements.',
+            'find_product service values are exact: COD, freeShipping, flashsale, official; sort values are priceasc, pricedesc, order, default.',
+            "In <think>, keep a short checklist with one entry per requested product and mark supported vs missing SKU/service/attribute constraints.",
+            "Recommend only if viewed_products support every requested title, service, SKU, color, size, pack, model, and attribute constraint.",
+            "If any requested SKU/attribute is missing or only approximately matched in viewed_products, search again.",
+            "Each replacement find_product call must target one failed product need and include the concrete missing color, size, pack, model, service, or attribute.",
+            "recommend_product ids must exactly match the verified budget_result product_ids and viewed_products evidence.",
+            "For same-shop vouchers, recommend only same-shop selected products.",
+        ]
         viewed = state.get("viewed_products") or []
         if max_viewed_products:
             viewed = viewed[:max_viewed_products]
         failed = state.get("failed_retry_searches") or []
+        previous = _previous_searches_from_trace(snapshot.search_trace, max_failed_searches)
+        selected_products = [
+            item
+            for item in state.get("selected_products", [])
+            if isinstance(item, dict)
+        ]
+        selected_by_id = {
+            str(item.get("product_id")): item
+            for item in selected_products
+            if item.get("product_id") is not None
+        }
         payload.update(
             {
-                "selected_products": [
-                    _compact_selected_row(item)
-                    for item in state.get("selected_products", [])
+                "selected_products": [_compact_selected_row(item) for item in selected_products],
+                "viewed_products": [
+                    _compact_viewed_row(item, selected_by_id)
+                    for item in viewed
                     if isinstance(item, dict)
                 ],
-                "viewed_products": [_compact_viewed_row(item) for item in viewed if isinstance(item, dict)],
                 "budget_result": _compact_budget_result(state.get("budget_calculation")),
                 "failed_retry_searches": failed[-max_failed_searches:] if max_failed_searches else failed,
             }
         )
+        if previous:
+            payload["previous_searches"] = previous
     return payload
 
 

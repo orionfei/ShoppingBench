@@ -37,7 +37,9 @@ from util.harness_fsm import (  # noqa: E402
     STATE_CANDIDATE_SELECT,
     build_harness_snapshot,
     build_compact_harness_user_prompt,
+    is_duplicate_find_product_in_turn,
     is_repeated_failed_search,
+    is_repeated_search,
 )
 from util.message import ASSISTANT_ROLES, USER_ROLES, Message, generate_tool_call_id  # noqa: E402
 from util.system_prompt import build_system_prompt  # noqa: E402
@@ -47,7 +49,8 @@ logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
 FSM_SYSTEM_PROMPT = (
     "You are a ShoppingBench agent. Read the latest <state> JSON and output exactly one "
-    "<tool_call> JSON array. Only tools listed in allowed_tools are valid."
+    "<think> block followed by exactly one <tool_call> JSON array. Only tools listed "
+    "in allowed_tools are valid."
 )
 
 BUDGET_CHECK_TOOL_SCHEMA = {
@@ -141,15 +144,15 @@ class ShoppingBenchXMLToolParser(ToolParser):
             except Exception as e:
                 logger.error(f"Failed to decode ShoppingBench tool call: {e}")
                 continue
-            if isinstance(parsed, dict):
-                parsed = [parsed]
             if not isinstance(parsed, list):
                 continue
             for call in parsed:
                 if not isinstance(call, dict):
                     continue
+                if set(call.keys()) != {"name", "parameters"}:
+                    continue
                 name = call.get("name")
-                arguments = call.get("parameters") or call.get("arguments") or {}
+                arguments = call.get("parameters") or {}
                 if isinstance(name, str) and isinstance(arguments, dict):
                     function_calls.append(FunctionCall(name=name, arguments=json.dumps(arguments, ensure_ascii=False)))
         return function_calls
@@ -259,16 +262,62 @@ class ToolAgentLoop(AgentLoopBase):
             if self.max_user_turns and user_turns >= self.max_user_turns:
                 break
 
-            # no tool calls
             assistant_text = await self.loop.run_in_executor(None, self.tokenizer.decode, response_ids)
-            tool_calls = await self.tool_parser.extract_tool_calls(response_ids)
             assistant_record = {"role": "assistant", "content": assistant_text}
-            if not tool_calls:
+            tool_block_error = self._tool_block_validation_error(assistant_text)
+            tool_json_error = None if tool_block_error else self._tool_call_json_validation_error(assistant_text)
+            if tool_block_error or tool_json_error:
+                error_response = self._format_error_response(tool_block_error or tool_json_error)
                 rollout_messages.append(assistant_record)
-                break
+                history_messages.append(self._format_error_history_message(error_response))
+                active_snapshot = self._state_local_snapshot(
+                    build_harness_snapshot(history_messages, allow_legacy_python_budget=False)
+                )
+                next_user_prompt = self._compact_state_prompt(active_snapshot, history_messages)
+                state_prompt_ids = await self.loop.run_in_executor(
+                    None,
+                    lambda: self.tokenizer.apply_chat_template(
+                        [{"role": "user", "content": next_user_prompt}],
+                        add_generation_prompt=True,
+                        tokenize=True,
+                    ),
+                )
+                if len(response_mask) + len(state_prompt_ids) >= self.response_length:
+                    break
+                rollout_messages.append(self._obs_record(error_response))
+                prompt_ids += state_prompt_ids
+                response_mask += [0] * len(state_prompt_ids)
+                rollout_messages.append({"role": "user", "content": next_user_prompt})
+                user_turns += 1
+                continue
+
+            tool_calls = await self.tool_parser.extract_tool_calls(response_ids)
+            if not tool_calls:
+                error_response = self._format_error_response({"error": "no_valid_tool_call"})
+                rollout_messages.append(assistant_record)
+                history_messages.append(self._format_error_history_message(error_response))
+                active_snapshot = self._state_local_snapshot(
+                    build_harness_snapshot(history_messages, allow_legacy_python_budget=False)
+                )
+                next_user_prompt = self._compact_state_prompt(active_snapshot, history_messages)
+                state_prompt_ids = await self.loop.run_in_executor(
+                    None,
+                    lambda: self.tokenizer.apply_chat_template(
+                        [{"role": "user", "content": next_user_prompt}],
+                        add_generation_prompt=True,
+                        tokenize=True,
+                    ),
+                )
+                if len(response_mask) + len(state_prompt_ids) >= self.response_length:
+                    break
+                rollout_messages.append(self._obs_record(error_response))
+                prompt_ids += state_prompt_ids
+                response_mask += [0] * len(state_prompt_ids)
+                rollout_messages.append({"role": "user", "content": next_user_prompt})
+                user_turns += 1
+                continue
 
             normalized_calls = self._normalize_tool_calls(tool_calls)
-            tool_block_error = self._tool_block_validation_error(assistant_text)
             assistant_record["tool_calls"] = [
                 {"name": item["name"], "parameters": item["parameters"]} for item in normalized_calls
             ]
@@ -476,6 +525,47 @@ class ToolAgentLoop(AgentLoopBase):
         return {str(product_id) for product_id in ids if product_id is not None}
 
     @staticmethod
+    def _viewed_product_ids(snapshot) -> set[str]:
+        state = snapshot.state if snapshot is not None and isinstance(snapshot.state, dict) else {}
+        return {
+            str(product.get("product_id"))
+            for product in state.get("viewed_products", [])
+            if isinstance(product, dict) and product.get("product_id") is not None
+        }
+
+    @staticmethod
+    def _budget_result(snapshot) -> dict[str, Any]:
+        state = snapshot.state if snapshot is not None and isinstance(snapshot.state, dict) else {}
+        budget = state.get("budget_calculation") or {}
+        return budget if isinstance(budget, dict) else {}
+
+    @classmethod
+    def _verified_shop_ids(cls, snapshot, product_ids: set[str]) -> set[str]:
+        state = snapshot.state if snapshot is not None and isinstance(snapshot.state, dict) else {}
+        shops = set()
+        for product in state.get("selected_products", []):
+            if not isinstance(product, dict):
+                continue
+            product_id = product.get("product_id")
+            if product_id is not None and str(product_id) in product_ids and product.get("shop_id") is not None:
+                shops.add(str(product.get("shop_id")))
+        budget = cls._budget_result(snapshot)
+        budget_ids = [str(item) for item in budget.get("product_ids") or [] if item is not None]
+        budget_shops = [str(item) for item in budget.get("shop_ids") or [] if item is not None]
+        for product_id, shop_id in zip(budget_ids, budget_shops):
+            if product_id in product_ids:
+                shops.add(shop_id)
+        return shops
+
+    @classmethod
+    def _budget_agent_voucher_requires_single_shop(cls, snapshot) -> bool:
+        voucher = cls._budget_result(snapshot).get("agent_voucher") or {}
+        if not isinstance(voucher, dict):
+            return False
+        voucher_type = str(voucher.get("type", "")).lower()
+        return "shop" in voucher_type or bool(voucher.get("scope_shop_id") or voucher.get("shop_id"))
+
+    @staticmethod
     def _unique_tool_call_id(name: str, parameters: dict[str, Any], used_ids: set[str]) -> str:
         base_id = generate_tool_call_id(name, parameters)
         tool_call_id = base_id
@@ -531,10 +621,55 @@ class ToolAgentLoop(AgentLoopBase):
         return {"find_product", "recommend_product", "terminate"}.issubset(allowed_tools)
 
     @staticmethod
+    def _strip_generation_markers(text: str) -> str:
+        if "<|im_start|>assistant" in text:
+            text = text.split("<|im_start|>assistant")[-1]
+        for marker in ("<|im_end|>", "<|endoftext|>"):
+            if marker in text:
+                text = text.split(marker)[0]
+        return text.strip()
+
+    @staticmethod
     def _tool_block_validation_error(text: str) -> dict[str, Any] | None:
-        if text.count("<tool_call>") == text.count("</tool_call>") == 1:
-            return None
-        return {"error": "exactly_one_tool_call_block_required"}
+        text = ToolAgentLoop._strip_generation_markers(text or "")
+        if text.count("<think>") != 1 or text.count("</think>") != 1:
+            return {"error": "exactly_one_think_block_required"}
+        if text.count("<tool_call>") != 1 or text.count("</tool_call>") != 1:
+            return {"error": "exactly_one_tool_call_block_required"}
+        if text.find("</think>") > text.find("<tool_call>"):
+            return {"error": "think_block_must_precede_tool_call_block"}
+        pattern = re.compile(r"^\s*<think>.*?</think>\s*<tool_call>.*?</tool_call>\s*$", re.DOTALL)
+        if not pattern.match(text):
+            return {"error": "state_local_output_must_be_think_then_tool_call_only"}
+        think_match = re.search(r"<think>(.*?)</think>", text, re.DOTALL)
+        if not think_match or not think_match.group(1).strip():
+            return {"error": "think_block_must_be_non_empty"}
+        return None
+
+    @staticmethod
+    def _tool_call_json_validation_error(text: str) -> dict[str, Any] | None:
+        text = ToolAgentLoop._strip_generation_markers(text or "")
+        match = re.search(r"<tool_call>(.*?)</tool_call>", text, re.DOTALL)
+        if not match:
+            return {"error": "exactly_one_tool_call_block_required"}
+        try:
+            parsed = json.loads(match.group(1).strip())
+        except Exception:
+            return {"error": "tool_call_json_must_be_valid_array"}
+        if not isinstance(parsed, list):
+            if isinstance(parsed, dict) and set(parsed.keys()) == {"name", "arguments"}:
+                return {"error": "tool_call_must_use_parameters_array_not_arguments_object"}
+            return {"error": "tool_call_must_be_json_array"}
+        if not parsed:
+            return {"error": "tool_call_array_must_be_non_empty"}
+        for item in parsed:
+            if isinstance(item, dict) and "arguments" in item:
+                return {"error": "tool_call_must_use_parameters_not_arguments"}
+            if not isinstance(item, dict) or set(item.keys()) != {"name", "parameters"}:
+                return {"error": "tool_call_items_require_exactly_name_and_parameters"}
+            if not isinstance(item.get("name"), str) or not isinstance(item.get("parameters"), dict):
+                return {"error": "tool_call_name_string_parameters_object_required"}
+        return None
 
     @classmethod
     def _tool_validation_error(
@@ -545,11 +680,70 @@ class ToolAgentLoop(AgentLoopBase):
     ) -> dict[str, Any] | None:
         allowed_tools = snapshot.include_tools
         tool_names = {call["name"] for call in all_calls}
+        parameters = tool_call.get("parameters") or {}
+        if tool_call["name"] == "find_product":
+            if not parameters.get("q") or parameters.get("page") in (None, ""):
+                return {
+                    "error": "find_product_requires_q_and_page",
+                    "tool": tool_call["name"],
+                    "required_fix": 'Use parameters {"q": string, "page": integer}.',
+                }
+            sort = parameters.get("sort")
+            if sort not in (None, "", "priceasc", "pricedesc", "order", "default"):
+                return {
+                    "error": "find_product_invalid_sort",
+                    "tool": tool_call["name"],
+                    "required_fix": 'Use sort only as one of "priceasc", "pricedesc", "order", or "default".',
+                }
+            service = parameters.get("service")
+            if service:
+                allowed_services = {"official", "freeShipping", "COD", "flashsale", "default"}
+                invalid_services = [
+                    item.strip()
+                    for item in str(service).split(",")
+                    if item.strip() and item.strip() not in allowed_services
+                ]
+                if invalid_services:
+                    return {
+                        "error": "find_product_invalid_service",
+                        "tool": tool_call["name"],
+                        "invalid_service_values": invalid_services,
+                        "required_fix": 'Use service values exactly from "COD", "freeShipping", "flashsale", "official", joined by comma if needed.',
+                    }
+        elif tool_call["name"] == "view_product_information":
+            if not parameters.get("product_ids"):
+                return {
+                    "error": "view_product_information_requires_product_ids",
+                    "tool": tool_call["name"],
+                    "required_fix": 'Use parameters {"product_ids": "id1,id2"}.',
+                }
+        elif tool_call["name"] == "budget_check":
+            if not parameters.get("product_ids") or parameters.get("budget") in (None, ""):
+                return {
+                    "error": "budget_check_requires_product_ids_and_budget",
+                    "tool": tool_call["name"],
+                    "required_fix": 'Use parameters {"product_ids": [string, ...], "voucher": object, "budget": number}.',
+                }
+        elif tool_call["name"] == "recommend_product":
+            if not parameters.get("product_ids"):
+                return {
+                    "error": "recommend_product_requires_product_ids",
+                    "tool": tool_call["name"],
+                    "required_fix": 'Use parameters {"product_ids": "id1,id2"}.',
+                }
+        elif tool_call["name"] == "terminate":
+            if parameters.get("status") != "success":
+                return {
+                    "error": "terminate_status_must_be_success",
+                    "tool": tool_call["name"],
+                    "required_fix": 'Use parameters {"status": "success"}.',
+                }
         if snapshot.state_name == STATE_CANDIDATE_SELECT and "budget_check" in tool_names:
             if "view_product_information" not in tool_names:
                 return {
                     "error": "budget_check_requires_view_product_information_in_select",
-                    "tool": tool_call["name"],
+                    "tool": "selection",
+                    "required_fix": "Call view_product_information and budget_check for the same selected product ids in the same turn.",
                 }
             view_ids = []
             budget_ids = []
@@ -561,35 +755,33 @@ class ToolAgentLoop(AgentLoopBase):
             if view_ids and budget_ids and set(view_ids) != set(budget_ids):
                 return {
                     "error": "view_and_budget_product_ids_must_match",
-                    "tool": tool_call["name"],
+                    "tool": "selection",
                     "view_product_ids": view_ids,
                     "budget_product_ids": budget_ids,
+                    "required_fix": "Use the exact same selected product ids in view_product_information and budget_check.",
                 }
         if cls._is_decision_tool_set(allowed_tools):
             if "find_product" in tool_names and bool({"recommend_product", "terminate"} & tool_names):
                 return {
                     "error": "mixed_decision_actions_not_allowed",
-                    "tool": tool_call["name"],
+                    "tool": "decision",
+                    "required_fix": "In DECISION, either call recommend_product plus terminate, or call only find_product.",
                 }
             if "terminate" in tool_names and "recommend_product" not in tool_names:
                 if tool_call["name"] == "terminate":
                     return {
                         "error": "terminate_requires_recommend_product_in_decision",
                         "tool": tool_call["name"],
+                        "required_fix": "Call recommend_product and terminate in the same tool_call array.",
                     }
             if "recommend_product" in tool_names and "terminate" not in tool_names:
                 if tool_call["name"] == "recommend_product":
                     return {
                         "error": "recommend_product_requires_terminate_in_decision",
                         "tool": tool_call["name"],
+                        "required_fix": "Call recommend_product and terminate in the same tool_call array.",
                     }
             if tool_call["name"] == "terminate":
-                status = (tool_call.get("parameters") or {}).get("status")
-                if status != "success":
-                    return {
-                        "error": "terminate_status_must_be_success",
-                        "tool": tool_call["name"],
-                    }
                 expected_ids = cls._budget_product_ids(snapshot) or cls._selected_product_ids(snapshot)
                 recommend_calls = [call for call in all_calls if call["name"] == "recommend_product"]
                 if len(recommend_calls) != 1:
@@ -597,20 +789,26 @@ class ToolAgentLoop(AgentLoopBase):
                         "error": "terminate_requires_exactly_one_recommend_product_in_same_turn",
                         "tool": tool_call["name"],
                         "recommend_product_call_count": len(recommend_calls),
+                        "required_fix": "Use exactly one recommend_product call before terminate in the same tool_call array.",
                     }
                 if recommend_calls:
-                    recommended_ids = set(
-                        cls._parse_product_ids_param((recommend_calls[0].get("parameters") or {}).get("product_ids"))
+                    recommended_list = cls._parse_product_ids_param(
+                        (recommend_calls[0].get("parameters") or {}).get("product_ids")
                     )
-                    if not recommended_ids or (expected_ids and recommended_ids != expected_ids):
+                    recommended_ids = set(recommended_list)
+                    if not recommended_ids or len(recommended_list) != len(recommended_ids) or (
+                        expected_ids and recommended_ids != expected_ids
+                    ):
                         return {
                             "error": "terminate_requires_valid_recommend_product_in_same_turn",
                             "tool": tool_call["name"],
                             "recommended_product_ids": sorted(recommended_ids),
                             "expected_product_ids": sorted(expected_ids),
+                            "required_fix": "Recommend exactly the product ids from the verified selection.",
                         }
             if tool_call["name"] == "recommend_product":
-                recommended_ids = set(cls._parse_product_ids_param((tool_call.get("parameters") or {}).get("product_ids")))
+                recommended_list = cls._parse_product_ids_param((tool_call.get("parameters") or {}).get("product_ids"))
+                recommended_ids = set(recommended_list)
                 selected_ids = cls._selected_product_ids(snapshot)
                 budget_ids = cls._budget_product_ids(snapshot)
                 expected_ids = budget_ids or selected_ids
@@ -618,6 +816,22 @@ class ToolAgentLoop(AgentLoopBase):
                     return {
                         "error": "recommend_product_requires_product_ids",
                         "tool": tool_call["name"],
+                        "required_fix": 'Use parameters {"product_ids": "id1,id2"}.',
+                    }
+                if len(recommended_list) != len(recommended_ids):
+                    return {
+                        "error": "recommend_product_duplicate_product_ids",
+                        "tool": tool_call["name"],
+                        "recommended_product_ids": recommended_list,
+                        "required_fix": "Recommend each verified product id exactly once.",
+                    }
+                if expected_ids and len(recommended_ids) != len(expected_ids):
+                    return {
+                        "error": "recommend_product_product_count_mismatch",
+                        "tool": tool_call["name"],
+                        "recommended_product_ids": sorted(recommended_ids),
+                        "expected_product_ids": sorted(expected_ids),
+                        "required_fix": "Recommend exactly the same number of product ids as the verified budget_check selection.",
                     }
                 if expected_ids and recommended_ids != expected_ids:
                     return {
@@ -625,17 +839,52 @@ class ToolAgentLoop(AgentLoopBase):
                         "tool": tool_call["name"],
                         "recommended_product_ids": sorted(recommended_ids),
                         "expected_product_ids": sorted(expected_ids),
+                        "required_fix": "Recommend exactly the product ids from the verified selection.",
                     }
+                viewed_ids = cls._viewed_product_ids(snapshot)
+                missing_view = sorted(product_id for product_id in recommended_ids if product_id not in viewed_ids)
+                if missing_view:
+                    return {
+                        "error": "recommend_requires_viewed_product_evidence",
+                        "tool": tool_call["name"],
+                        "recommended_product_ids": sorted(recommended_ids),
+                        "missing_viewed_product_ids": missing_view,
+                        "required_fix": "Call view_product_information for every recommended product id before recommending.",
+                    }
+                if cls._budget_agent_voucher_requires_single_shop(snapshot):
+                    shops = cls._verified_shop_ids(snapshot, recommended_ids)
+                    if len(shops) != 1:
+                        return {
+                            "error": "shop_voucher_recommend_requires_single_shop",
+                            "tool": tool_call["name"],
+                            "recommended_product_ids": sorted(recommended_ids),
+                            "shop_ids": sorted(shops),
+                            "required_fix": "For a shop voucher, recommend only products verified from one shop or search for a same-shop bundle.",
+                        }
         if tool_call["name"] not in allowed_tools:
             return {
                 "error": "tool_not_allowed_in_current_state",
                 "tool": tool_call["name"],
                 "allowed_tools": sorted(allowed_tools),
+                "required_fix": "Choose a tool from allowed_tools only.",
             }
         if tool_call["name"] == "find_product" and is_repeated_failed_search(tool_call.get("parameters", {}), snapshot):
             return {
                 "error": "repeated_failed_search_not_allowed",
                 "tool": tool_call["name"],
+                "required_fix": "Change the search parameters before retrying.",
+            }
+        if tool_call["name"] == "find_product" and is_duplicate_find_product_in_turn(tool_call, all_calls):
+            return {
+                "error": "duplicate_find_product_in_same_turn_not_allowed",
+                "tool": tool_call["name"],
+                "required_fix": "Do not repeat the same find_product parameters within one tool_call array.",
+            }
+        if tool_call["name"] == "find_product" and is_repeated_search(tool_call.get("parameters", {}), snapshot):
+            return {
+                "error": "repeated_search_not_allowed",
+                "tool": tool_call["name"],
+                "required_fix": "Use a new q, page, shop_id, price, sort, or service value.",
             }
         return None
 
@@ -648,6 +897,55 @@ class ToolAgentLoop(AgentLoopBase):
             "tool_response": json.dumps(error, ensure_ascii=False),
             "result": error,
         }
+
+    @staticmethod
+    def _format_error_response(error: dict[str, Any]) -> dict[str, Any]:
+        payload = {"tool": "format", **error}
+        payload.setdefault("required_fix", ToolAgentLoop._format_required_fix(payload.get("error")))
+        payload.setdefault("required_format", ToolAgentLoop._format_required_format())
+        return {
+            "tool_call_id": "format_error",
+            "name": "format",
+            "parameters": {},
+            "tool_response": json.dumps(payload, ensure_ascii=False),
+            "result": payload,
+        }
+
+    @staticmethod
+    def _format_required_format() -> str:
+        return '<think>brief reasoning</think><tool_call>[{"name":"allowed_tool","parameters":{}}]</tool_call>'
+
+    @staticmethod
+    def _format_required_fix(error: str | None) -> str:
+        fixes = {
+            "empty_model_content": "Output a non-empty <think>...</think><tool_call>...</tool_call> message.",
+            "exactly_one_think_block_required": "Output exactly one opening <think> and one closing </think> before <tool_call>.",
+            "exactly_one_tool_call_block_required": "Output exactly one opening <tool_call> and one closing </tool_call> after <think>. Do not use XML tags like <find_product>, function-call syntax, markdown, or natural language outside the blocks.",
+            "think_block_must_precede_tool_call_block": "Place <think>...</think> before <tool_call>...</tool_call>.",
+            "state_local_output_must_be_think_then_tool_call_only": "Output only <think>...</think><tool_call>...</tool_call>, with no text outside the tags.",
+            "think_block_must_be_non_empty": "Put concise reasoning inside <think>...</think>.",
+            "tool_call_json_must_be_valid_array": 'Inside <tool_call> must be raw JSON array only, for example [{"name":"find_product","parameters":{"q":"...","page":1}}]. Do not use XML tags like <find_product> or <function=...>.',
+            "tool_call_must_be_json_array": 'The <tool_call> content must be a JSON array [...] not a single object {...}. Wrap one call as [{"name":"allowed_tool","parameters":{}}].',
+            "tool_call_must_use_parameters_array_not_arguments_object": 'Do not use Qwen/OpenAI native function-call shape. Use a JSON array and the key "parameters": [{"name":"allowed_tool","parameters":{}}].',
+            "tool_call_must_use_parameters_not_arguments": 'Use the ShoppingBench key "parameters", not "arguments". Each item must be {"name":"allowed_tool","parameters":{}}.',
+            "tool_call_array_must_be_non_empty": "Include at least one tool call object in the JSON array.",
+            "tool_call_items_require_exactly_name_and_parameters": 'Each tool call object must contain exactly "name" and "parameters"; do not use "arguments" or "tool_call_id".',
+            "tool_call_name_string_parameters_object_required": '"name" must be a string and "parameters" must be an object.',
+            "no_valid_tool_call": "Use the exact tool_call schema from the prompt with allowed tool names; do not output OpenAI function-call syntax or XML tool tags.",
+        }
+        return fixes.get(error or "", "Fix the output format and retry.")
+
+    @staticmethod
+    def _format_error_history_message(error_response: dict[str, Any]) -> str:
+        message = Message(
+            obs=[
+                {
+                    "tool_call_id": error_response["tool_call_id"],
+                    "results": error_response["result"],
+                }
+            ]
+        )
+        return message.to_string(ASSISTANT_ROLES)
 
     @staticmethod
     def _is_error_result(result) -> bool:
