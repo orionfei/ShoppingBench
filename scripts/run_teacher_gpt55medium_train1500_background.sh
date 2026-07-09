@@ -51,6 +51,12 @@ load_env() {
   fi
   export OPENAI_BASE_URL="$REMOTE_BASE_URL"
   export OPENAI_API_KEY="$REMOTE_API_KEY"
+  if [[ -z "${JAVA_HOME:-}" && -x "/root/miniconda3/envs/shoppingbench/lib/jvm/bin/javac" ]]; then
+    export JAVA_HOME="/root/miniconda3/envs/shoppingbench/lib/jvm"
+  fi
+  if [[ -n "${JAVA_HOME:-}" ]]; then
+    export PATH="${JAVA_HOME}/bin:${PATH}"
+  fi
   export NO_PROXY="35.220.164.252,127.0.0.1,localhost,${NO_PROXY:-}"
   export no_proxy="$NO_PROXY"
 }
@@ -191,7 +197,21 @@ show_status() {
   [[ -f "$REPORT_FILE" ]] && echo "Runner report: ${REPORT_FILE}"
   [[ -f "$STAGE_REPORT_FILE" ]] && echo "Stage report: ${STAGE_REPORT_FILE}"
   if [[ -f "$ROLLOUT_FILE" ]]; then
-    echo "Rollout lines: $(wc -l < "$ROLLOUT_FILE") / $(wc -l < "$SAMPLE_FILE")"
+    status_sample_file="$SAMPLE_FILE"
+    if [[ -f "$META_FILE" ]]; then
+      status_sample_file="$("$PYTHON" - <<PY
+import json
+from pathlib import Path
+meta = json.loads(Path("$META_FILE").read_text(encoding="utf-8"))
+print(meta.get("sample_file") or "$SAMPLE_FILE")
+PY
+)"
+    fi
+    if [[ -f "$status_sample_file" ]]; then
+      echo "Rollout lines: $(wc -l < "$ROLLOUT_FILE") / $(wc -l < "$status_sample_file")"
+    else
+      echo "Rollout lines: $(wc -l < "$ROLLOUT_FILE")"
+    fi
   fi
   [[ -f "$LOG_FILE" ]] && tail -n 40 "$LOG_FILE"
 }
