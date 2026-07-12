@@ -1,0 +1,23 @@
+{
+  "run_id": "sft_clean924_test8_g4_t02_fast_20260709_065621",
+  "source_root": "checkpoints/shoppingbench-sft/sft_clean924_prefix_len10240_full_3ep_20260709_043231",
+  "selected_root": "reports/sft_clean924_test8_g4_t02_fast_20260709_065621/selected_checkpoints",
+  "selected_steps": [
+    54,
+    81,
+    108,
+    135,
+    159
+  ],
+  "query_val_files": "dataset/probe/sft_clean924_test8_state_local/probe.parquet",
+  "product_cache": "dataset/probe/sft_clean924_test8_state_local/product_cache.json",
+  "temperature": 0.2,
+  "top_p": 0.9,
+  "rollout_n": 4,
+  "max_assistant_turns": 8,
+  "max_user_turns": 8,
+  "max_response_length": 8192,
+  "max_model_len": 10240,
+  "agent_workers": 16,
+  "reason_for_fast_config": "skip global_step_27, cap long-tail turns/tokens, increase agent workers"
+}

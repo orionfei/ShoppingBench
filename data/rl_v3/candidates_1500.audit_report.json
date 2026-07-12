@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "created_unix": 1783742269.2957942,
+  "generated": 1500,
+  "static_eligible": 1414,
+  "repair": 86,
+  "reason_counts": {
+    "full_title_copied": 86
+  },
+  "generator_models": {
+    "qwen3.6-flash": 1500
+  },
+  "generator_failed_attempts": 0,
+  "query_unique": 1500,
+  "eligible_rate": 0.9426666666666667,
+  "eligible_distributions": {
+    "product_count": {
+      "1": 289,
+      "2": 496,
+      "3": 418,
+      "4": 211
+    },
+    "voucher_type": {
+      "platform": 426,
+      "shop": 988
+    },
+    "discount_type": {
+      "fixed": 565,
+      "percentage": 849
+    },
+    "budget_difficulty": {
+      "easy": 351,
+      "hard": 422,
+      "medium": 641
+    },
+    "constraint_complexity": {
+      "high": 364,
+      "low": 342,
+      "medium": 708
+    }
+  },
+  "repair_distributions": {
+    "product_count": {
+      "1": 11,
+      "2": 30,
+      "3": 32,
+      "4": 13
+    },
+    "voucher_type": {
+      "platform": 24,
+      "shop": 62
+    },
+    "discount_type": {
+      "fixed": 35,
+      "percentage": 51
+    },
+    "budget_difficulty": {
+      "easy": 24,
+      "hard": 28,
+      "medium": 34
+    },
+    "constraint_complexity": {
+      "high": 11,
+      "low": 33,
+      "medium": 42
+    }
+  },
+  "eligible_query_words": {
+    "min": 49,
+    "p50": 80,
+    "p95": 109,
+    "max": 183
+  },
+  "eligible_query_characters": {
+    "min": 253,
+    "p50": 438,
+    "p95": 610,
+    "max": 1019
+  },
+  "test_product_overlap": 0,
+  "audit_path": "data/rl_v3/candidates_1500.audit.jsonl",
+  "audit_sha256": "a90106d188630ea9192dd4315b941b3bdd5d35f2fc8a5ed49a8626d144c6271e",
+  "eligible_path": "data/rl_v3/candidates_1500.static_eligible.jsonl",
+  "eligible_sha256": "3cf8b35b9c17fabf86a6e7379272155c9e2d28540a24b25a61abdc67ab3752b7",
+  "repair_path": "data/rl_v3/candidates_1500.repair.jsonl",
+  "repair_sha256": "71fe20da408f274507c8ce41f5f6df8976ffea530c86eb2d5c0c4d9dddcd5129"
+}

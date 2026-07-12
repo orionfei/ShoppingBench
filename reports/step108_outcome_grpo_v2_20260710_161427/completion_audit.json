@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "checks": {
+    "formal_training_return_code_zero": true,
+    "completed_epochs": 2,
+    "completed_steps": 80,
+    "effective_train_batch": 16,
+    "group_size": 8,
+    "train_trajectory_files": 80,
+    "train_trajectories": 10240,
+    "validation_steps": [0, 10, 20, 30, 40, 50, 60, 70, 80],
+    "validation_trajectories_per_step": 128,
+    "reward_invariant_violations": 0,
+    "checkpoint_boundaries_saved_before_prune": [20, 40, 60, 80],
+    "selected_checkpoint_step": 60,
+    "original_sft_checkpoint_preserved": true,
+    "test75_models": ["untouched_step108", "best_step60"],
+    "test75_trajectories_per_model": 600,
+    "test75_used_for_selection": false,
+    "trainer_metrics_jsonl_records": 81,
+    "trainer_metrics_csv_records": 81,
+    "system_metrics_rows": 13476,
+    "system_metrics_median_interval_seconds": 5.0516,
+    "gpu_utilization_mean_pct": 87.5243,
+    "gpu_memory_peak_mib": 72223,
+    "disk_minimum_free_gib": 16.433,
+    "final_free_disk_gib_approx": 33,
+    "scorer_and_supervisor_tests_passed": 17,
+    "training_png_verified": 7,
+    "test_png_verified": 9,
+    "gpu_memory_released_after_completion": true
+  },
+  "registered_success_criterion": {
+    "required_validation_terminal_asr_improvement_pp": 5.0,
+    "best_healthy_saved_improvement_pp": 4.6875,
+    "achieved": false,
+    "stop_reason": "The last two saved milestones improved only 0.78pp, below the 2pp extension gate; no extension to three epochs."
+  }
+}

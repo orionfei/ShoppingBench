@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "selection_rule": "hard combined-failure gates, then mixed_terminal_asr CI95 lower bound, mixed_paper_asr_group_rate, terminal_pass_at_g, terminal_asr, lower token/time cost",
+  "config": {
+    "group_size_default": 8,
+    "bootstrap_draws": 10000,
+    "bootstrap_seed": 20260710,
+    "format_min": 0.98,
+    "max_failure_rate": 0.01,
+    "allow_truncation_as_outcome": false,
+    "workflow_drop_max": 0.05
+  },
+  "warnings": [],
+  "runs": [
+    {
+      "run_id": "rl_v3_worker_smoke",
+      "temperature": 0.4,
+      "top_p": 0.95,
+      "seed": 108,
+      "group_size": 8,
+      "source": "/root/project/ShoppingBench/rollouts/rl_v3_worker_smoke/rl_v3_worker8_smoke8",
+      "rows": 64,
+      "queries": 8,
+      "complete_groups": 8,
+      "rollout_complete_rate": 1.0,
+      "paper_asr": 0.390625,
+      "terminal_asr": 0.390625,
+      "paper_asr_known_rate": 1.0,
+      "terminal_asr_known_rate": 1.0,
+      "paper_group_counts": {
+        "mixed": 6,
+        "all_fail": 2
+      },
+      "terminal_group_counts": {
+        "mixed": 6,
+        "all_fail": 2
+      },
+      "mixed_paper_asr_group_rate": 0.75,
+      "mixed_terminal_asr_group_rate": 0.75,
+      "mixed_paper_asr_ci95": [
+        0.375,
+        1.0
+      ],
+      "mixed_terminal_asr_ci95": [
+        0.375,
+        1.0
+      ],
+      "paper_pass_at_g": 0.75,
+      "terminal_pass_at_g": 0.75,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.9375,
+      "failure_counts": {
+        "server_error": 0,
+        "json_decode": 0,
+        "truncation": 1,
+        "runaway": 0
+      },
+      "failure_rate": 0.015625,
+      "infrastructure_failure_rate": 0.0,
+      "token_limit_noncompletion_rate": 0.015625,
+      "response_tokens_mean": 6704.734375,
+      "response_tokens_p50": 7263.0,
+      "response_tokens_p95": 10178.1,
+      "response_tokens_max": 10240.0,
+      "steps_mean": 5.921875,
+      "steps_p50": 5.0,
+      "steps_p95": 11.849999999999994,
+      "steps_max": 12.0,
+      "elapsed_seconds": null,
+      "reward_batch_wall_seconds": 3.69822845607996,
+      "reward_wall_fraction": null,
+      "title_embedding_cache_size": 29.0,
+      "title_embeddings_added": 29.0,
+      "trajectories_per_second": null,
+      "outcome_field_sources": {
+        "paper_asr": {
+          "paper_asr": 64
+        },
+        "terminal_asr": {
+          "terminal_asr": 64
+        }
+      },
+      "groups": [
+        {
+          "query_key": "14366749d554dde8",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 7,
+          "terminal_successes": 7,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "422f55714de813b1",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "4b10f5b4b8925da0",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "4dacc46bfffb41c0",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 7,
+          "terminal_successes": 7,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "83c81b8a7090d0c3",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "991f999c3ef8d1e1",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 2,
+          "terminal_successes": 2,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "c7035248f424ea27",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "d56a9a7c7bd0efd6",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 7,
+          "terminal_successes": 7,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        }
+      ],
+      "warnings": [],
+      "gate_eligible": false,
+      "gate_reasons": [
+        "failure_rate_above_threshold"
+      ],
+      "baseline_workflow_valid_mean": null
+    }
+  ],
+  "ranking": [],
+  "config_ranking": []
+}

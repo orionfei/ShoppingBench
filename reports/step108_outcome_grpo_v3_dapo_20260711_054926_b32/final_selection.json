@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "training_run": "rollouts/step108_outcome_grpo_v3_dapo_20260711_054926",
+  "registered_planned_steps": 90,
+  "actual_stop_step": 45,
+  "stop_rule": "no sustained validation improvement at the registered midpoint",
+  "validation": {
+    "step0_terminal_asr": 0.330078125,
+    "best_step": 23,
+    "best_terminal_asr": 0.34765625,
+    "step45_terminal_asr": 0.33984375,
+    "required_success_threshold": 0.380078125
+  },
+  "validation_selected_checkpoint": "checkpoints/shoppingbench-rl-v3-dapo/step108_outcome_grpo_v3_dapo_20260711_054926_b32/best",
+  "test_used_for_selection": false,
+  "test250": {
+    "queries": 250,
+    "group_size": 8,
+    "trajectories_per_model": 2000,
+    "untouched_step108": {
+      "terminal_asr": 0.083,
+      "pass_at_8": 0.2,
+      "mixed_group_rate": 0.192
+    },
+    "step23": {
+      "terminal_asr": 0.0825,
+      "pass_at_8": 0.204,
+      "mixed_group_rate": 0.184
+    },
+    "paired_terminal_asr_difference": -0.0005,
+    "paired_bootstrap_ci95": [-0.0145, 0.0125],
+    "conclusion": "no detectable generalization improvement"
+  },
+  "deployment_recommendation": "keep untouched Step108 as the default RL starting and fallback checkpoint; retain step23 for diagnosis only"
+}

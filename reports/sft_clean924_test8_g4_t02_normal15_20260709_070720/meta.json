@@ -1,0 +1,24 @@
+{
+  "run_id": "sft_clean924_test8_g4_t02_normal15_20260709_070720",
+  "source_root": "checkpoints/shoppingbench-sft/sft_clean924_prefix_len10240_full_3ep_20260709_043231",
+  "selected_root": "reports/sft_clean924_test8_g4_t02_normal15_20260709_070720/selected_checkpoints",
+  "selected_steps": [
+    54,
+    81,
+    108,
+    135,
+    159
+  ],
+  "query_val_files": "dataset/probe/sft_clean924_test8_state_local/probe.parquet",
+  "product_cache": "dataset/probe/sft_clean924_test8_state_local/product_cache.json",
+  "temperature": 0.2,
+  "top_p": 0.9,
+  "rollout_n": 4,
+  "max_assistant_turns": 15,
+  "max_user_turns": 15,
+  "max_response_length": 10240,
+  "max_model_len": 12288,
+  "agent_workers": 8,
+  "launcher": "data/tmp/sft_clean924_test8_g4_t02_normal15_20260709_070720.launch.sh",
+  "note": "normal full setting requested by user after abandoning fast 8-turn/8192 run"
+}

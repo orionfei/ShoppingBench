@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "decision_unix": 1783734354.0089695,
+  "analysis": "/root/project/ShoppingBench/rollouts/step108_outcome_grpo_v2_20260710_161427/attempt_b16/analysis.json",
+  "completed_epochs": 2,
+  "extended_to_three_epochs": false,
+  "extension_reason": "not extended: selected checkpoint did not reach step0+5pp and the last two saved milestones improved by only 0.78pp (<2pp extension gate)",
+  "success_threshold_terminal_asr": 0.4171875,
+  "registered_success_achieved": false,
+  "best_checkpoint_step": 60,
+  "best_checkpoint_path": "/root/project/ShoppingBench/checkpoints/shoppingbench-rl-formal/step108_outcome_grpo_v2_20260710_161427_b16/global_step_60",
+  "selection_reason": "highest validation terminal ASR among health-eligible saved checkpoints; then paper ASR, health/truncation, response cost, and earlier step",
+  "selected_metrics": {
+    "training_step": 60,
+    "paper_asr": 0.4140625,
+    "terminal_asr": 0.4140625,
+    "mixed_terminal_asr_group_rate": 0.5,
+    "terminal_pass_at_g": 0.625,
+    "format_mean": 1.0,
+    "workflow_valid_mean": 0.90625,
+    "infrastructure_failure_rate": 0.0078125,
+    "token_limit_noncompletion_rate": 0.0390625,
+    "response_tokens_mean": 6412.65625,
+    "health_eligible": true,
+    "health_reasons": [],
+    "is_saved_checkpoint": true
+  },
+  "final_step80_metrics": {
+    "training_step": 80,
+    "paper_asr": 0.421875,
+    "terminal_asr": 0.421875,
+    "mixed_terminal_asr_group_rate": 0.5625,
+    "terminal_pass_at_g": 0.6875,
+    "format_mean": 1.0,
+    "workflow_valid_mean": 0.9296875,
+    "infrastructure_failure_rate": 0.0234375,
+    "token_limit_noncompletion_rate": 0.0546875,
+    "response_tokens_mean": 6538.46875,
+    "health_eligible": false,
+    "health_reasons": [
+      "infrastructure_failure_above_0.01"
+    ],
+    "is_saved_checkpoint": true
+  },
+  "validation_runs": [
+    {
+      "training_step": 0,
+      "paper_asr": 0.3671875,
+      "terminal_asr": 0.3671875,
+      "mixed_terminal_asr_group_rate": 0.625,
+      "terminal_pass_at_g": 0.6875,
+      "format_mean": 0.994140625,
+      "workflow_valid_mean": 0.921875,
+      "infrastructure_failure_rate": 0.015625,
+      "token_limit_noncompletion_rate": 0.0625,
+      "response_tokens_mean": 6394.765625,
+      "health_eligible": false,
+      "health_reasons": [
+        "infrastructure_failure_above_0.01"
+      ],
+      "is_saved_checkpoint": false
+    },
+    {
+      "training_step": 10,
+      "paper_asr": 0.4296875,
+      "terminal_asr": 0.4296875,
+      "mixed_terminal_asr_group_rate": 0.4375,
+      "terminal_pass_at_g": 0.5625,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.890625,
+      "infrastructure_failure_rate": 0.0078125,
+      "token_limit_noncompletion_rate": 0.0703125,
+      "response_tokens_mean": 6291.1953125,
+      "health_eligible": true,
+      "health_reasons": [],
+      "is_saved_checkpoint": false
+    },
+    {
+      "training_step": 20,
+      "paper_asr": 0.421875,
+      "terminal_asr": 0.421875,
+      "mixed_terminal_asr_group_rate": 0.5625,
+      "terminal_pass_at_g": 0.625,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.9140625,
+      "infrastructure_failure_rate": 0.015625,
+      "token_limit_noncompletion_rate": 0.078125,
+      "response_tokens_mean": 6439.625,
+      "health_eligible": false,
+      "health_reasons": [
+        "infrastructure_failure_above_0.01"
+      ],
+      "is_saved_checkpoint": true
+    },
+    {
+      "training_step": 30,
+      "paper_asr": 0.390625,
+      "terminal_asr": 0.390625,
+      "mixed_terminal_asr_group_rate": 0.5,
+      "terminal_pass_at_g": 0.625,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.921875,
+      "infrastructure_failure_rate": 0.0078125,
+      "token_limit_noncompletion_rate": 0.046875,
+      "response_tokens_mean": 6315.3984375,
+      "health_eligible": true,
+      "health_reasons": [],
+      "is_saved_checkpoint": false
+    },
+    {
+      "training_step": 40,
+      "paper_asr": 0.3984375,
+      "terminal_asr": 0.3984375,
+      "mixed_terminal_asr_group_rate": 0.5,
+      "terminal_pass_at_g": 0.625,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.90625,
+      "infrastructure_failure_rate": 0.0078125,
+      "token_limit_noncompletion_rate": 0.0390625,
+      "response_tokens_mean": 6388.2890625,
+      "health_eligible": true,
+      "health_reasons": [],
+      "is_saved_checkpoint": true
+    },
+    {
+      "training_step": 50,
+      "paper_asr": 0.4140625,
+      "terminal_asr": 0.4140625,
+      "mixed_terminal_asr_group_rate": 0.5,
+      "terminal_pass_at_g": 0.625,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.921875,
+      "infrastructure_failure_rate": 0.0,
+      "token_limit_noncompletion_rate": 0.015625,
+      "response_tokens_mean": 6523.5078125,
+      "health_eligible": true,
+      "health_reasons": [],
+      "is_saved_checkpoint": false
+    },
+    {
+      "training_step": 60,
+      "paper_asr": 0.4140625,
+      "terminal_asr": 0.4140625,
+      "mixed_terminal_asr_group_rate": 0.5,
+      "terminal_pass_at_g": 0.625,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.90625,
+      "infrastructure_failure_rate": 0.0078125,
+      "token_limit_noncompletion_rate": 0.0390625,
+      "response_tokens_mean": 6412.65625,
+      "health_eligible": true,
+      "health_reasons": [],
+      "is_saved_checkpoint": true
+    },
+    {
+      "training_step": 70,
+      "paper_asr": 0.375,
+      "terminal_asr": 0.375,
+      "mixed_terminal_asr_group_rate": 0.5625,
+      "terminal_pass_at_g": 0.625,
+      "format_mean": 0.99375,
+      "workflow_valid_mean": 0.921875,
+      "infrastructure_failure_rate": 0.015625,
+      "token_limit_noncompletion_rate": 0.0625,
+      "response_tokens_mean": 6474.9765625,
+      "health_eligible": false,
+      "health_reasons": [
+        "infrastructure_failure_above_0.01"
+      ],
+      "is_saved_checkpoint": false
+    },
+    {
+      "training_step": 80,
+      "paper_asr": 0.421875,
+      "terminal_asr": 0.421875,
+      "mixed_terminal_asr_group_rate": 0.5625,
+      "terminal_pass_at_g": 0.6875,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.9296875,
+      "infrastructure_failure_rate": 0.0234375,
+      "token_limit_noncompletion_rate": 0.0546875,
+      "response_tokens_mean": 6538.46875,
+      "health_eligible": false,
+      "health_reasons": [
+        "infrastructure_failure_above_0.01"
+      ],
+      "is_saved_checkpoint": true
+    }
+  ],
+  "saved_steps_before_prune": [
+    20,
+    40,
+    60,
+    80
+  ],
+  "selected_checkpoint_inventory": [
+    {
+      "path": "extra_state_world_size_2_rank_0.pt",
+      "bytes": 14632,
+      "sha256": "d13f120832e0095d5fc063d2c6313ef755af497475028d4fa77790548eb12fb0"
+    },
+    {
+      "path": "extra_state_world_size_2_rank_1.pt",
+      "bytes": 14632,
+      "sha256": "b138bdb8bf9bbca4fc1f6531f683c8d8c683dc3bd8f69da47a61a489c3854181"
+    },
+    {
+      "path": "fsdp_config.json",
+      "bytes": 46,
+      "sha256": "1df34c1f433cd641f48d99b3981b311f0362bfcfd4c4e1f727301e3b50cf03bf"
+    },
+    {
+      "path": "huggingface/added_tokens.json",
+      "bytes": 707,
+      "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+    },
+    {
+      "path": "huggingface/config.json",
+      "bytes": 1536,
+      "sha256": "d053297a74c2a27f5c1fd337ae234f2210643d0fe1a05a12147e0237855b3706"
+    },
+    {
+      "path": "huggingface/generation_config.json",
+      "bytes": 214,
+      "sha256": "64d86df2173901c58389974bde21f7d2ab9eb7d79f35a337753329d39cf265c0"
+    },
+    {
+      "path": "huggingface/special_tokens_map.json",
+      "bytes": 613,
+      "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+    },
+    {
+      "path": "huggingface/tokenizer.json",
+      "bytes": 11422654,
+      "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+    },
+    {
+      "path": "huggingface/tokenizer_config.json",
+      "bytes": 5404,
+      "sha256": "443bfa629eb16387a12edbf92a76f6a6f10b2af3b53d87ba1550adfcf45f7fa0"
+    },
+    {
+      "path": "huggingface/vocab.json",
+      "bytes": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    },
+    {
+      "path": "model_world_size_2_rank_0.pt",
+      "bytes": 4411657746,
+      "sha256": "15d54f08a8448d8958da0b054a41813dfa02ae78e554c97e6e48d8e38cd7cad4"
+    },
+    {
+      "path": "model_world_size_2_rank_1.pt",
+      "bytes": 4411657746,
+      "sha256": "169e50505692ae301edde870a0f0b07897f663c461808384d4cee5be1560494c"
+    }
+  ],
+  "pruned_checkpoint_steps": [
+    20,
+    40,
+    80
+  ]
+}

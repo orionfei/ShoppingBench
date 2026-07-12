@@ -1,0 +1,38 @@
+{
+  "repair_sample_ids": [
+    "voucher_train_000011",
+    "voucher_train_000197"
+  ],
+  "val_rows": 64,
+  "val_unique_products": 160,
+  "val_unique_shops": 112,
+  "excluded_train_products": 3379,
+  "excluded_test_products": 714,
+  "maximin_embedding_model": "Qwen3-Embedding-0.6B",
+  "distributions": {
+    "product_count": {
+      "2": 16,
+      "1": 16,
+      "4": 16,
+      "3": 16
+    },
+    "voucher_type": {
+      "shop": 32,
+      "platform": 32
+    },
+    "discount_type": {
+      "fixed": 32,
+      "percentage": 32
+    },
+    "difficulty": {
+      "medium": 24,
+      "hard": 24,
+      "easy": 16
+    },
+    "complexity": {
+      "low": 16,
+      "high": 16,
+      "medium": 32
+    }
+  }
+}

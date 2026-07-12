@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "status": "static_audit_complete",
+  "created_unix": 1783741641.9084523,
+  "profile": "rl-v3-candidate",
+  "candidate_total": 1500,
+  "seed": 20260711,
+  "max_documents_loaded": 100000,
+  "query_generator_model": "qwen3.6-flash",
+  "query_generator_env_file": "/root/project/ResearchHarness/.env",
+  "plan_path": "/root/project/ShoppingBench/data/rl_v3/candidates_1500.plan.jsonl",
+  "plan_sha256": "f6c9b3e7c91dce625c1fe761b90f5f07851810462394e6fce11042028a192143",
+  "documents_path": "/root/project/ShoppingBench/resources/documents.jsonl",
+  "documents_bytes": 5112146514,
+  "documents_sha256": "d108a6c7d3956b1389a6c77a2f220db9f8c7f925abfe286e2479f3def37975ce",
+  "test_parquet_path": "/root/project/ShoppingBench/dataset/shoppingbench_query_rl_v2/test.parquet",
+  "test_parquet_sha256": "bed81d9d91315bc9384f9313a7008d93a3a13341f8055294062c8c25e0f4dc28",
+  "excluded_product_ids_path": "/root/project/ShoppingBench/data/rl_v3/excluded_test75_product_ids.txt",
+  "excluded_product_ids": 211,
+  "excluded_product_ids_sha256": "37f10e33dd2237f93245310c29dc37ef18520e48ba67cd0d35ae9d5d13748b27",
+  "sampled_unique_product_ids": 3598,
+  "test_product_overlap": 0,
+  "distributions": {
+    "product_count": {
+      "1": 300,
+      "2": 526,
+      "3": 450,
+      "4": 224
+    },
+    "voucher_type": {
+      "platform": 450,
+      "shop": 1050
+    },
+    "discount_type": {
+      "fixed": 600,
+      "percentage": 900
+    },
+    "budget_difficulty": {
+      "easy": 375,
+      "hard": 450,
+      "medium": 675
+    },
+    "constraint_complexity": {
+      "high": 375,
+      "low": 375,
+      "medium": 750
+    }
+  },
+  "code_sha256": {
+    "scripts/sample_coupon_budget.py": "967d7bbb9c65dd073b502f28c148796a8dc1549ce92ad05684eefb5a69db65d7",
+    "scripts/prepare_rl_v3_candidates.py": "33741045b88b7eed6b5524873babcd05b09fdb6e0c68f726e538981854f6211b",
+    "config/rl/rl_v3_query_generator_qwen36_flash.json": "9275f62210db18f4e491a21608992c6a1875d2fab4548a8205f92579c5c5e8bc",
+    "scripts/audit_rl_v3_candidates.py": "befcf3d70c8071e211c2f5c832c94e1d9d16dcccc0199bcfab4be65afcffd8a0"
+  },
+  "query_path": "data/rl_v3/candidates_1500.query.jsonl",
+  "query_sha256": "509d56232866d665f5c1532646a141324337276f1976007b5e13dd2d6c3dae20",
+  "query_metadata_path": "data/rl_v3/candidates_1500.query.meta.jsonl",
+  "query_metadata_sha256": "11def9a43e45ea6312e69620bcc1fd770fd5d15270ad5ec1c4a243353fc669d8",
+  "static_audit_report": "data/rl_v3/candidates_1500.audit_report.json",
+  "static_eligible": 1414,
+  "static_repair": 86,
+  "generator_model": "qwen3.6-flash",
+  "generator_failed_attempts": 0,
+  "static_eligible_path": "data/rl_v3/candidates_1500.static_eligible.jsonl",
+  "static_eligible_sha256": "3cf8b35b9c17fabf86a6e7379272155c9e2d28540a24b25a61abdc67ab3752b7"
+}

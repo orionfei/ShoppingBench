@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "run_id": "step108_outcome_grpo_v2_20260710_161427",
+  "effective_batch_size": 16,
+  "group_size": 8,
+  "completed_epochs": 2,
+  "completed_steps": 80,
+  "extended_to_three_epochs": false,
+  "best_checkpoint_step": 60,
+  "registered_validation_success_achieved": false,
+  "validation_step0_terminal_asr": 0.3671875,
+  "validation_best_healthy_saved_terminal_asr": 0.4140625,
+  "validation_improvement_pp": 4.6875,
+  "test75": {
+    "queries_per_model": 75,
+    "trajectories_per_model": 600,
+    "untouched_step108_terminal_asr": 0.3016666666666667,
+    "best_step60_terminal_asr": 0.31,
+    "terminal_asr_difference_pp": 0.8333333333333333,
+    "paired_bootstrap_terminal_difference_ci95_pp": [-2.666666666666667, 4.333333333333334],
+    "untouched_step108_pass_at_8": 0.5866666666666667,
+    "best_step60_pass_at_8": 0.6133333333333333,
+    "pass_at_8_difference_pp": 2.6666666666666665,
+    "paired_bootstrap_pass_at_8_difference_ci95_pp": [-5.333333333333334, 10.666666666666668],
+    "untouched_step108_mean_response_tokens": 7301.673333333333,
+    "best_step60_mean_response_tokens": 7188.13
+  },
+  "conclusion": "Small positive test trend and improved efficiency/health, but the ASR difference is not statistically conclusive."
+}

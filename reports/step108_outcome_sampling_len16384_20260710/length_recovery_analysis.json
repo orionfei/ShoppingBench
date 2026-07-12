@@ -1,0 +1,791 @@
+{
+  "schema_version": 1,
+  "selection_rule": "hard gates, then mixed_terminal_asr CI95 lower bound, mixed_paper_asr_group_rate, terminal_pass_at_g, terminal_asr, lower token/time cost",
+  "config": {
+    "group_size_default": 8,
+    "bootstrap_draws": 10000,
+    "bootstrap_seed": 20260710,
+    "format_min": 0.98,
+    "max_failure_rate": 0.01,
+    "workflow_drop_max": 0.05
+  },
+  "warnings": [],
+  "runs": [
+    {
+      "run_id": "len16384_t02_p095_seed0",
+      "temperature": 0.2,
+      "top_p": 0.95,
+      "seed": 0,
+      "group_size": 8,
+      "checkpoint": "global_step_108",
+      "checkpoint_path": "checkpoints/shoppingbench-sft/sft_clean924_prefix_len10240_full_3ep_20260709_043231/global_step_108",
+      "dataset": "dataset/probe/step108_outcome_sampling/calibration16.parquet",
+      "max_response_length": 16384,
+      "max_assistant_turns": 15,
+      "max_user_turns": 15,
+      "rollout_max_num_seqs": 8,
+      "elapsed_seconds": 663.0,
+      "source": "/root/project/ShoppingBench/rollouts/step108_outcome_sampling_len16384_20260710/len16384_t02_p095_seed0",
+      "rows": 128,
+      "queries": 16,
+      "complete_groups": 16,
+      "rollout_complete_rate": 1.0,
+      "paper_asr": 0.2890625,
+      "terminal_asr": 0.2890625,
+      "paper_asr_known_rate": 1.0,
+      "terminal_asr_known_rate": 1.0,
+      "paper_group_counts": {
+        "mixed": 11,
+        "all_fail": 5
+      },
+      "terminal_group_counts": {
+        "mixed": 11,
+        "all_fail": 5
+      },
+      "mixed_paper_asr_group_rate": 0.6875,
+      "mixed_terminal_asr_group_rate": 0.6875,
+      "mixed_paper_asr_ci95": [
+        0.4375,
+        0.875
+      ],
+      "mixed_terminal_asr_ci95": [
+        0.4375,
+        0.875
+      ],
+      "paper_pass_at_g": 0.6875,
+      "terminal_pass_at_g": 0.6875,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.8203125,
+      "failure_counts": {
+        "server_error": 0,
+        "json_decode": 1,
+        "truncation": 12,
+        "runaway": 0
+      },
+      "failure_rate": 0.1015625,
+      "response_tokens_mean": 10238.84375,
+      "response_tokens_p50": 9819.0,
+      "response_tokens_p95": 16384.0,
+      "response_tokens_max": 16384.0,
+      "steps_mean": 7.0703125,
+      "steps_p50": 6.0,
+      "steps_p95": 14.0,
+      "steps_max": 14.0,
+      "reward_batch_wall_seconds": 4.141720499843359,
+      "reward_wall_fraction": 0.006246938913790888,
+      "title_embedding_cache_size": 38.0,
+      "title_embeddings_added": 38.0,
+      "trajectories_per_second": 0.19306184012066366,
+      "outcome_field_sources": {
+        "paper_asr": {
+          "paper_asr": 128
+        },
+        "terminal_asr": {
+          "terminal_asr": 128
+        }
+      },
+      "groups": [
+        {
+          "query_key": "0dd8563958e6c109",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "191a4e0bb57a4fd3",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "2ebbaef5fff3b32c",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "2f515dde3248ca7a",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 2,
+          "terminal_successes": 2,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "509c30a7e90ce7c8",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "5554b03757b7d9e0",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "602d6fa962609a31",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 7,
+          "terminal_successes": 7,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "6eae9599692e0009",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 7,
+          "terminal_successes": 7,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "866b92eaf7dff99e",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 4,
+          "terminal_successes": 4,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "9805a11501af9d62",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "a36492b5f23b94a7",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "a488fc525fb80a57",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 6,
+          "terminal_successes": 6,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "a8fa1a6c8a915083",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "c2a1ecf578d29e24",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 4,
+          "terminal_successes": 4,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "d9e86f499a15a383",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "e3c9d29391a5edfb",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 3,
+          "terminal_successes": 3,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        }
+      ],
+      "warnings": [],
+      "gate_eligible": false,
+      "gate_reasons": [
+        "failure_rate_above_threshold"
+      ],
+      "baseline_workflow_valid_mean": 0.8671875
+    },
+    {
+      "run_id": "len16384_t02_p09_seed0",
+      "temperature": 0.2,
+      "top_p": 0.9,
+      "seed": 0,
+      "group_size": 8,
+      "checkpoint": "global_step_108",
+      "checkpoint_path": "checkpoints/shoppingbench-sft/sft_clean924_prefix_len10240_full_3ep_20260709_043231/global_step_108",
+      "dataset": "dataset/probe/step108_outcome_sampling/calibration16.parquet",
+      "max_response_length": 16384,
+      "max_assistant_turns": 15,
+      "max_user_turns": 15,
+      "rollout_max_num_seqs": 8,
+      "elapsed_seconds": 676.0,
+      "source": "/root/project/ShoppingBench/rollouts/step108_outcome_sampling_len16384_20260710/len16384_t02_p09_seed0",
+      "rows": 128,
+      "queries": 16,
+      "complete_groups": 16,
+      "rollout_complete_rate": 1.0,
+      "paper_asr": 0.28125,
+      "terminal_asr": 0.28125,
+      "paper_asr_known_rate": 1.0,
+      "terminal_asr_known_rate": 1.0,
+      "paper_group_counts": {
+        "all_fail": 7,
+        "mixed": 9
+      },
+      "terminal_group_counts": {
+        "all_fail": 7,
+        "mixed": 9
+      },
+      "mixed_paper_asr_group_rate": 0.5625,
+      "mixed_terminal_asr_group_rate": 0.5625,
+      "mixed_paper_asr_ci95": [
+        0.3125,
+        0.8125
+      ],
+      "mixed_terminal_asr_ci95": [
+        0.3125,
+        0.8125
+      ],
+      "paper_pass_at_g": 0.5625,
+      "terminal_pass_at_g": 0.5625,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.8671875,
+      "failure_counts": {
+        "server_error": 0,
+        "json_decode": 0,
+        "truncation": 9,
+        "runaway": 1
+      },
+      "failure_rate": 0.0703125,
+      "response_tokens_mean": 10171.03125,
+      "response_tokens_p50": 9923.0,
+      "response_tokens_p95": 16384.0,
+      "response_tokens_max": 16384.0,
+      "steps_mean": 7.0625,
+      "steps_p50": 5.0,
+      "steps_p95": 14.0,
+      "steps_max": 14.0,
+      "reward_batch_wall_seconds": 5.331373866647482,
+      "reward_wall_fraction": 0.007886647731727044,
+      "title_embedding_cache_size": 51.0,
+      "title_embeddings_added": 51.0,
+      "trajectories_per_second": 0.1893491124260355,
+      "outcome_field_sources": {
+        "paper_asr": {
+          "paper_asr": 128
+        },
+        "terminal_asr": {
+          "terminal_asr": 128
+        }
+      },
+      "groups": [
+        {
+          "query_key": "0dd8563958e6c109",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "191a4e0bb57a4fd3",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "2ebbaef5fff3b32c",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "2f515dde3248ca7a",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 2,
+          "terminal_successes": 2,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "509c30a7e90ce7c8",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "5554b03757b7d9e0",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "602d6fa962609a31",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 7,
+          "terminal_successes": 7,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "6eae9599692e0009",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 5,
+          "terminal_successes": 5,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "866b92eaf7dff99e",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 4,
+          "terminal_successes": 4,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "9805a11501af9d62",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "a36492b5f23b94a7",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "a488fc525fb80a57",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 6,
+          "terminal_successes": 6,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "a8fa1a6c8a915083",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "c2a1ecf578d29e24",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 5,
+          "terminal_successes": 5,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "d9e86f499a15a383",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "e3c9d29391a5edfb",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 5,
+          "terminal_successes": 5,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        }
+      ],
+      "warnings": [],
+      "gate_eligible": false,
+      "gate_reasons": [
+        "failure_rate_above_threshold"
+      ],
+      "baseline_workflow_valid_mean": 0.8671875
+    },
+    {
+      "run_id": "len16384_t06_p08_seed0",
+      "temperature": 0.6,
+      "top_p": 0.8,
+      "seed": 0,
+      "group_size": 8,
+      "checkpoint": "global_step_108",
+      "checkpoint_path": "checkpoints/shoppingbench-sft/sft_clean924_prefix_len10240_full_3ep_20260709_043231/global_step_108",
+      "dataset": "dataset/probe/step108_outcome_sampling/calibration16.parquet",
+      "max_response_length": 16384,
+      "max_assistant_turns": 15,
+      "max_user_turns": 15,
+      "rollout_max_num_seqs": 8,
+      "elapsed_seconds": 670.0,
+      "source": "/root/project/ShoppingBench/rollouts/step108_outcome_sampling_len16384_20260710/len16384_t06_p08_seed0",
+      "rows": 128,
+      "queries": 16,
+      "complete_groups": 16,
+      "rollout_complete_rate": 1.0,
+      "paper_asr": 0.3046875,
+      "terminal_asr": 0.3046875,
+      "paper_asr_known_rate": 1.0,
+      "terminal_asr_known_rate": 1.0,
+      "paper_group_counts": {
+        "all_fail": 7,
+        "mixed": 9
+      },
+      "terminal_group_counts": {
+        "all_fail": 7,
+        "mixed": 9
+      },
+      "mixed_paper_asr_group_rate": 0.5625,
+      "mixed_terminal_asr_group_rate": 0.5625,
+      "mixed_paper_asr_ci95": [
+        0.3125,
+        0.8125
+      ],
+      "mixed_terminal_asr_ci95": [
+        0.3125,
+        0.8125
+      ],
+      "paper_pass_at_g": 0.5625,
+      "terminal_pass_at_g": 0.5625,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.8359375,
+      "failure_counts": {
+        "server_error": 0,
+        "json_decode": 0,
+        "truncation": 10,
+        "runaway": 0
+      },
+      "failure_rate": 0.078125,
+      "response_tokens_mean": 10589.859375,
+      "response_tokens_p50": 14092.0,
+      "response_tokens_p95": 16384.0,
+      "response_tokens_max": 16384.0,
+      "steps_mean": 7.5859375,
+      "steps_p50": 8.0,
+      "steps_p95": 13.0,
+      "steps_max": 14.0,
+      "reward_batch_wall_seconds": 5.593802325427532,
+      "reward_wall_fraction": 0.008348958694667959,
+      "title_embedding_cache_size": 38.0,
+      "title_embeddings_added": 38.0,
+      "trajectories_per_second": 0.191044776119403,
+      "outcome_field_sources": {
+        "paper_asr": {
+          "paper_asr": 128
+        },
+        "terminal_asr": {
+          "terminal_asr": 128
+        }
+      },
+      "groups": [
+        {
+          "query_key": "0dd8563958e6c109",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "191a4e0bb57a4fd3",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "2ebbaef5fff3b32c",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 3,
+          "terminal_successes": 3,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "2f515dde3248ca7a",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 7,
+          "terminal_successes": 7,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "509c30a7e90ce7c8",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "5554b03757b7d9e0",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "602d6fa962609a31",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "6eae9599692e0009",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 6,
+          "terminal_successes": 6,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "866b92eaf7dff99e",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 4,
+          "terminal_successes": 4,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "9805a11501af9d62",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "a36492b5f23b94a7",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 2,
+          "terminal_successes": 2,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "a488fc525fb80a57",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 7,
+          "terminal_successes": 7,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "a8fa1a6c8a915083",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "c2a1ecf578d29e24",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 3,
+          "terminal_successes": 3,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "d9e86f499a15a383",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "e3c9d29391a5edfb",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 6,
+          "terminal_successes": 6,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        }
+      ],
+      "warnings": [],
+      "gate_eligible": false,
+      "gate_reasons": [
+        "failure_rate_above_threshold"
+      ],
+      "baseline_workflow_valid_mean": 0.8671875
+    }
+  ],
+  "ranking": [],
+  "config_ranking": []
+}

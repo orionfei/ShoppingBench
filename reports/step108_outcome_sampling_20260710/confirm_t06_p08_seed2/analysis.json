@@ -1,0 +1,313 @@
+{
+  "schema_version": 1,
+  "selection_rule": "hard infrastructure gates with token-limit noncompletion treated as outcome=0, then mixed_terminal_asr CI95 lower bound, mixed_paper_asr_group_rate, terminal_pass_at_g, terminal_asr, lower token/time cost",
+  "config": {
+    "group_size_default": 8,
+    "bootstrap_draws": 10000,
+    "bootstrap_seed": 20260710,
+    "format_min": 0.98,
+    "max_failure_rate": 0.01,
+    "allow_truncation_as_outcome": true,
+    "workflow_drop_max": 0.05
+  },
+  "warnings": [],
+  "runs": [
+    {
+      "run_id": "confirm_t06_p08_seed2",
+      "temperature": 0.6,
+      "top_p": 0.8,
+      "seed": 2,
+      "group_size": 8,
+      "checkpoint": "global_step_108",
+      "checkpoint_path": "checkpoints/shoppingbench-sft/sft_clean924_prefix_len10240_full_3ep_20260709_043231/global_step_108",
+      "dataset": "dataset/probe/step108_outcome_sampling/validation16.parquet",
+      "max_response_length": 10240,
+      "max_assistant_turns": 15,
+      "max_user_turns": 15,
+      "rollout_max_num_seqs": 8,
+      "elapsed_seconds": 316.0,
+      "source": "/root/project/ShoppingBench/rollouts/step108_outcome_sampling_20260710/confirm_t06_p08_seed2",
+      "rows": 128,
+      "queries": 16,
+      "complete_groups": 16,
+      "rollout_complete_rate": 1.0,
+      "paper_asr": 0.4140625,
+      "terminal_asr": 0.4140625,
+      "paper_asr_known_rate": 1.0,
+      "terminal_asr_known_rate": 1.0,
+      "paper_group_counts": {
+        "mixed": 10,
+        "all_fail": 3,
+        "all_success": 3
+      },
+      "terminal_group_counts": {
+        "mixed": 10,
+        "all_fail": 3,
+        "all_success": 3
+      },
+      "mixed_paper_asr_group_rate": 0.625,
+      "mixed_terminal_asr_group_rate": 0.625,
+      "mixed_paper_asr_ci95": [
+        0.375,
+        0.875
+      ],
+      "mixed_terminal_asr_ci95": [
+        0.375,
+        0.875
+      ],
+      "paper_pass_at_g": 0.8125,
+      "terminal_pass_at_g": 0.8125,
+      "format_mean": 1.0,
+      "workflow_valid_mean": 0.9140625,
+      "failure_counts": {
+        "server_error": 0,
+        "json_decode": 0,
+        "truncation": 5,
+        "runaway": 0
+      },
+      "failure_rate": 0.0390625,
+      "infrastructure_failure_rate": 0.0,
+      "token_limit_noncompletion_rate": 0.0390625,
+      "response_tokens_mean": 6381.6484375,
+      "response_tokens_p50": 5472.5,
+      "response_tokens_p95": 10226.85,
+      "response_tokens_max": 10240.0,
+      "steps_mean": 5.1796875,
+      "steps_p50": 5.0,
+      "steps_p95": 10.0,
+      "steps_max": 14.0,
+      "reward_batch_wall_seconds": 3.7689075209200382,
+      "reward_wall_fraction": 0.011926922534557082,
+      "title_embedding_cache_size": 37.0,
+      "title_embeddings_added": 37.0,
+      "trajectories_per_second": 0.4050632911392405,
+      "outcome_field_sources": {
+        "paper_asr": {
+          "paper_asr": 128
+        },
+        "terminal_asr": {
+          "terminal_asr": 128
+        }
+      },
+      "groups": [
+        {
+          "query_key": "0036151ef5fc5232",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 7,
+          "terminal_successes": 7,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "2c03e0707d84448f",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "39697532c71b5e8d",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 3,
+          "terminal_successes": 3,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "41ac0719ba6b95f2",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 2,
+          "terminal_successes": 2,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "4a45e74430f6fe4a",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "54f19c3bd9043ace",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "6c5d29474ef1bd90",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "7ac5412fa1be2daa",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 8,
+          "terminal_successes": 8,
+          "paper_state": "all_success",
+          "terminal_state": "all_success"
+        },
+        {
+          "query_key": "8867617063ecd21d",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 8,
+          "terminal_successes": 8,
+          "paper_state": "all_success",
+          "terminal_state": "all_success"
+        },
+        {
+          "query_key": "895116c78f3fa476",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 8,
+          "terminal_successes": 8,
+          "paper_state": "all_success",
+          "terminal_state": "all_success"
+        },
+        {
+          "query_key": "cadcb2ded2247c7b",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 7,
+          "terminal_successes": 7,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "d2ebc1359fc64a5d",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "db38f681a51792af",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 5,
+          "terminal_successes": 5,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "dcdc73fd40117545",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        },
+        {
+          "query_key": "e61d87458c020a88",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 0,
+          "terminal_successes": 0,
+          "paper_state": "all_fail",
+          "terminal_state": "all_fail"
+        },
+        {
+          "query_key": "e7258296878156c2",
+          "samples": 8,
+          "complete": true,
+          "paper_known": 8,
+          "terminal_known": 8,
+          "paper_successes": 1,
+          "terminal_successes": 1,
+          "paper_state": "mixed",
+          "terminal_state": "mixed"
+        }
+      ],
+      "warnings": [],
+      "gate_eligible": true,
+      "gate_reasons": [],
+      "baseline_workflow_valid_mean": null,
+      "rank": 1
+    }
+  ],
+  "ranking": [
+    {
+      "rank": 1,
+      "run_id": "confirm_t06_p08_seed2",
+      "temperature": 0.6,
+      "top_p": 0.8,
+      "seed": 2,
+      "mixed_terminal_asr_ci95_lower": 0.375,
+      "mixed_terminal_asr_group_rate": 0.625
+    }
+  ],
+  "config_ranking": [
+    {
+      "temperature": 0.6,
+      "top_p": 0.8,
+      "run_count": 1,
+      "eligible_run_count": 1,
+      "all_runs_eligible": true,
+      "seed_count": 1,
+      "seeds": [
+        2
+      ],
+      "query_group_observations": 16,
+      "mixed_terminal_asr_group_rate": 0.625,
+      "mixed_terminal_asr_ci95": [
+        0.375,
+        0.875
+      ],
+      "mixed_paper_asr_group_rate": 0.625,
+      "terminal_pass_at_g": 0.8125,
+      "terminal_asr": 0.4140625,
+      "response_tokens_mean": 6381.6484375,
+      "elapsed_seconds_mean": 316.0,
+      "rank": 1
+    }
+  ]
+}

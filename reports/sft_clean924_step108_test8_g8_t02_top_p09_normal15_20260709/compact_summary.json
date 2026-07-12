@@ -1,0 +1,25 @@
+{
+  "run_id": "sft_clean924_step108_test8_g8_t02_top_p09_normal15_20260709",
+  "checkpoint": "global_step_108",
+  "temperature": 0.2,
+  "top_p": 0.9,
+  "rollout_n": 8,
+  "queries": 8,
+  "rows": 64,
+  "success": 0.0,
+  "success_n": 0,
+  "task": -0.0232421875,
+  "progress": 0.03463541666666667,
+  "protocol": 0.2765388257575757,
+  "format": 0.17291666666666666,
+  "tool_valid": 0.3801609848484849,
+  "workflow_valid": 0.984375,
+  "steps": 2.078125,
+  "failure_modes": {
+    "protocol_invalid": 58,
+    "workflow_invalid": 1,
+    "no_recommendation": 1,
+    "search_recall_gap": 4
+  },
+  "report": "reports/sft_clean924_step108_test8_g8_t02_top_p09_normal15_20260709/global_step_108.json"
+}

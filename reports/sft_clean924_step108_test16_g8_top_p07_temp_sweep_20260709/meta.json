@@ -1,0 +1,18 @@
+{
+  "run_id": "sft_clean924_step108_test16_g8_top_p07_temp_sweep_20260709",
+  "checkpoint": "global_step_108",
+  "checkpoint_path": "checkpoints/shoppingbench-sft/sft_clean924_prefix_len10240_full_3ep_20260709_043231/global_step_108",
+  "selected_root": "reports/sft_clean924_step108_test16_g8_top_p07_temp_sweep_20260709/selected_checkpoints",
+  "query_val_files": "dataset/probe/sft_clean924_test16_state_local/probe.parquet",
+  "product_cache": "dataset/probe/sft_clean924_test16_state_local/product_cache.json",
+  "temperatures": [0.2, 0.4, 0.6, 0.8, 1.0],
+  "top_p": 0.7,
+  "rollout_n": 8,
+  "queries": 16,
+  "max_assistant_turns": 15,
+  "max_user_turns": 15,
+  "max_response_length": 10240,
+  "rollout_max_model_len": 12288,
+  "rollout_max_num_seqs": 32,
+  "agent_workers": 16
+}
