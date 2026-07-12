@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="600" viewBox="0 0 760 600">
+<rect width="100%" height="100%" fill="white"/>
+<title>Mixed terminal-ASR group rate</title>
+<text x="380.0" y="30.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Mixed terminal-ASR group rate</text>
+<rect x="85.0" y="65.0" width="322.5" height="463.0" fill="#42ba74" stroke="white" stroke-width="1"/>
+<text x="246.2" y="296.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="middle">0.688</text>
+<rect x="407.5" y="65.0" width="322.5" height="463.0" fill="#34ad7c" stroke="white" stroke-width="1"/>
+<text x="568.8" y="296.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.625</text>
+<text x="77.0" y="296.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.2</text>
+<text x="246.2" y="546.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.8</text>
+<text x="568.8" y="546.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.9</text>
+<text x="407.5" y="566.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">top-p</text>
+<text x="28.0" y="55.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#9aa5af" text-anchor="start" dominant-baseline="auto">temperature</text>
+</svg>

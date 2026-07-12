@@ -1,0 +1,269 @@
+{
+  "schema_version": 2,
+  "decision": "reuse existing queries; repartition and enrich without reward/query regeneration",
+  "seed": 20260710,
+  "counts": {
+    "train": 643,
+    "validation": 16,
+    "calibration": 16,
+    "test": 75
+  },
+  "total_queries": 750,
+  "total_unique_products": 2093,
+  "query_partition_is_disjoint_cover": true,
+  "final_test_development_query_overlap": 0,
+  "final_test_development_product_overlap": 0,
+  "current_sft_query_overlap_inherited_from_source_audit": 0,
+  "missing_product_cache_ids": 0,
+  "ideal_exact_answer_paper_asr": 750,
+  "ideal_exact_answer_total": 750,
+  "test_repair": {
+    "original_test_product_overlap_count": 4,
+    "original_test_product_overlap_ids": [
+      "1079446875",
+      "2704619527",
+      "3920759120",
+      "957540134"
+    ],
+    "conflicting_test_rows": 2,
+    "swaps": [
+      {
+        "removed_from_test_query_id": "540469c7723a306f21e53eedc2c4daad55768125321ce64bda9ad0a21f2b14b7",
+        "removed_source_index": 257,
+        "removed_product_ids": [
+          "1812495948",
+          "3412846508",
+          "3920759120",
+          "2993659844"
+        ],
+        "overlapping_product_ids": [
+          "3920759120"
+        ],
+        "replacement_query_id": "632dd360df3632499af20d06e52975279cb79e297b2af78a312687f48ca060f4",
+        "replacement_source_index": 148,
+        "replacement_product_ids": [
+          "4394669583",
+          "3587066398",
+          "4816030688",
+          "4383579509"
+        ],
+        "exact_stratum_match": true,
+        "stratum": [
+          "platform",
+          "fixed",
+          4,
+          "hard",
+          "data/rl_voucher_sample450_synthesize.jsonl"
+        ]
+      },
+      {
+        "removed_from_test_query_id": "ec4dc6e148f57a49a902655cf3c04d11b75e36284d83571e8891a9330fdf9e20",
+        "removed_source_index": 245,
+        "removed_product_ids": [
+          "2704619527",
+          "1079446875",
+          "957540134"
+        ],
+        "overlapping_product_ids": [
+          "1079446875",
+          "2704619527",
+          "957540134"
+        ],
+        "replacement_query_id": "02b1010a6f9ccff2915a71fb16dccee33c2cccac0eb46bb0b8835dda75003ed3",
+        "replacement_source_index": 166,
+        "replacement_product_ids": [
+          "4931839477",
+          "1704876016",
+          "4714177471"
+        ],
+        "exact_stratum_match": true,
+        "stratum": [
+          "shop",
+          "percentage",
+          3,
+          "hard",
+          "data/rl_voucher_clean300_synthesize.jsonl"
+        ]
+      }
+    ]
+  },
+  "splits": {
+    "train": {
+      "rows": 643,
+      "parquet": "dataset/shoppingbench_query_rl_v2/train.parquet",
+      "sha256": "a60b0fb82f685cb55864d26358b86f43da2fab111d3b80dab404105f42797a95",
+      "unique_products": 1797,
+      "max_prompt_tokens": 1532,
+      "distribution": {
+        "voucher_type": {
+          "platform": 193,
+          "shop": 450
+        },
+        "discount_type": {
+          "fixed": 238,
+          "percentage": 405
+        },
+        "product_count": {
+          "1": 51,
+          "2": 195,
+          "3": 217,
+          "4": 180
+        },
+        "budget_difficulty": {
+          "easy": 117,
+          "hard": 300,
+          "medium": 226
+        },
+        "threshold_difficulty": {
+          "easy": 166,
+          "hard": 153,
+          "medium": 324
+        },
+        "constraint_complexity": {
+          "high": 301,
+          "low": 105,
+          "medium": 237
+        },
+        "source_file": {
+          "data/rl_voucher_clean300_synthesize.jsonl": 252,
+          "data/rl_voucher_sample450_synthesize.jsonl": 391
+        }
+      }
+    },
+    "validation": {
+      "rows": 16,
+      "parquet": "dataset/shoppingbench_query_rl_v2/validation.parquet",
+      "sha256": "f9218bf951a65f8f36472829ed12ac0cf56936a25cdcbdb80a114032afbd76a7",
+      "unique_products": 43,
+      "max_prompt_tokens": 1486,
+      "distribution": {
+        "voucher_type": {
+          "platform": 5,
+          "shop": 11
+        },
+        "discount_type": {
+          "fixed": 6,
+          "percentage": 10
+        },
+        "product_count": {
+          "1": 2,
+          "2": 5,
+          "3": 5,
+          "4": 4
+        },
+        "budget_difficulty": {
+          "easy": 3,
+          "hard": 6,
+          "medium": 7
+        },
+        "threshold_difficulty": {
+          "easy": 3,
+          "hard": 6,
+          "medium": 7
+        },
+        "constraint_complexity": {
+          "high": 6,
+          "low": 3,
+          "medium": 7
+        },
+        "source_file": {
+          "data/rl_voucher_clean300_synthesize.jsonl": 6,
+          "data/rl_voucher_sample450_synthesize.jsonl": 10
+        }
+      }
+    },
+    "calibration": {
+      "rows": 16,
+      "parquet": "dataset/shoppingbench_query_rl_v2/calibration.parquet",
+      "sha256": "08c2061729596f17dfb3589306486987053be15e11a407bbd38cc2ba33991b67",
+      "unique_products": 43,
+      "max_prompt_tokens": 1467,
+      "distribution": {
+        "voucher_type": {
+          "platform": 5,
+          "shop": 11
+        },
+        "discount_type": {
+          "fixed": 6,
+          "percentage": 10
+        },
+        "product_count": {
+          "1": 2,
+          "2": 5,
+          "3": 5,
+          "4": 4
+        },
+        "budget_difficulty": {
+          "easy": 6,
+          "hard": 6,
+          "medium": 4
+        },
+        "threshold_difficulty": {
+          "easy": 3,
+          "hard": 5,
+          "medium": 8
+        },
+        "constraint_complexity": {
+          "high": 5,
+          "low": 2,
+          "medium": 9
+        },
+        "source_file": {
+          "data/rl_voucher_clean300_synthesize.jsonl": 7,
+          "data/rl_voucher_sample450_synthesize.jsonl": 9
+        }
+      }
+    },
+    "test": {
+      "rows": 75,
+      "parquet": "dataset/shoppingbench_query_rl_v2/test.parquet",
+      "sha256": "bed81d9d91315bc9384f9313a7008d93a3a13341f8055294062c8c25e0f4dc28",
+      "unique_products": 211,
+      "max_prompt_tokens": 1500,
+      "distribution": {
+        "voucher_type": {
+          "platform": 22,
+          "shop": 53
+        },
+        "discount_type": {
+          "fixed": 32,
+          "percentage": 43
+        },
+        "product_count": {
+          "1": 6,
+          "2": 23,
+          "3": 25,
+          "4": 21
+        },
+        "budget_difficulty": {
+          "easy": 21,
+          "hard": 27,
+          "medium": 27
+        },
+        "threshold_difficulty": {
+          "easy": 22,
+          "hard": 16,
+          "medium": 37
+        },
+        "constraint_complexity": {
+          "high": 29,
+          "low": 8,
+          "medium": 38
+        },
+        "source_file": {
+          "data/rl_voucher_clean300_synthesize.jsonl": 35,
+          "data/rl_voucher_sample450_synthesize.jsonl": 40
+        }
+      }
+    }
+  },
+  "manifest": "dataset/shoppingbench_query_rl_v2/manifest.json",
+  "manifest_sha256": "6e5f716abd1bdfe9edd8e52b735fa49148ace5d99b9acda514001adf49ef56ef",
+  "product_cache": "dataset/shoppingbench_query/product_cache.json",
+  "notes": [
+    "calibration is an archive for sampling-selection evidence and is excluded from training",
+    "validation is the fixed online RL monitor and is excluded from training",
+    "test is an internal 75-query holdout and remains untouched until a trained checkpoint exists",
+    "all added fields are diagnostics/curriculum metadata and never enter the outcome reward"
+  ]
+}

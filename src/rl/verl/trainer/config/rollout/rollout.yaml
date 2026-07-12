@@ -31,11 +31,13 @@ gpu_memory_utilization: 0.5
 # Whether to ignore EOS and continue generating after EOS is hit.
 ignore_eos: False
 
-# Whether to disable CUDA graph. Default True to allow cache freeing.
-enforce_eager: True
+# Whether to disable CUDA graph. ShoppingBench keeps CUDA graph enabled; the
+# max_num_seqs scheduler cap provides stability without the eager-mode slowdown.
+enforce_eager: False
 
-# Whether to free engine KVCache after generation. Set enforce_eager=True when enabled.
-free_cache_engine: True
+# Whether to free engine KVCache after generation. Disabled because it requires
+# eager mode and was not part of the validated best G=4/G=8 rollout setup.
+free_cache_engine: False
 
 # TP size for rollout. Not effective for hf
 tensor_model_parallel_size: 2
@@ -46,8 +48,17 @@ max_num_batched_tokens: 8192
 # max length for rollout
 max_model_len: null
 
-# max length of sequences
-max_num_seqs: 1024
+# Maximum number of sequences scheduled concurrently by each rollout engine.
+# ShoppingBench G=4/G=8 probes found 8 to be the best stable default for long,
+# multi-turn tool rollouts.
+max_num_seqs: 8
+
+# Pass max_num_seqs to the async vLLM engine. Set False only for an explicit
+# legacy-path fallback.
+apply_max_num_seqs: True
+
+# Whether async vLLM automatic prefix caching is enabled.
+enable_prefix_caching: True
 
 # [Will be deprecated, use log_prob_micro_batch_size_per_gpu] The batch size for one forward pass in the computation of log_prob. Global batch size.
 log_prob_micro_batch_size: null
@@ -177,6 +188,36 @@ agent:
 
   # Number of agent loop workers
   num_workers: 8
+
+  # Deterministic async rollout controls. Enabled for reproducible G=4/G=8
+  # behavior; each training step and rollout replica still receives a distinct seed.
+  stable_sampling:
+
+    # Enable the stable async rollout path.
+    enabled: True
+
+    # Pass a deterministic per-trajectory seed to vLLM SamplingParams.
+    seed_requests: True
+
+    # Use a deterministic request id derived from step, prompt fingerprint, and rollout offset.
+    deterministic_request_id: True
+
+    # Keep async server handles in creation order instead of shuffling them per agent worker.
+    stable_server_order: True
+
+    # Route new request ids to servers by stable hash instead of per-worker least-request state.
+    stable_server_routing: True
+
+    # Base seed for reproducible evaluation sweeps. Change this to get another independent sample set.
+    seed_base: 0
+
+    # Add this offset to rollout ids. Use 0 for a first G=4 run and 4 for a second G=4 run
+    # when comparing them to one G=8 run.
+    rollout_offset_base: 0
+
+    # Keep vLLM engine-level generation_config.n at 1. GRPO G is already represented
+    # by outer prompt repetition, so engine-level n must not change with G.
+    force_generation_config_n1: True
 
   # custom async server configs
   custom_async_server:

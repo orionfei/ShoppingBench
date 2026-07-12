@@ -31,9 +31,14 @@ class SingleTurnAgentLoop(AgentLoopBase):
         self.prompt_length = config.actor_rollout_ref.rollout.prompt_length
         self.response_length = config.actor_rollout_ref.rollout.response_length
 
-    async def run(self, messages: list[dict[str, Any]], sampling_params: dict[str, Any]) -> AgentLoopOutput:
+    async def run(
+        self,
+        messages: list[dict[str, Any]],
+        sampling_params: dict[str, Any],
+        trajectory: dict[str, Any] | None = None,
+    ) -> AgentLoopOutput:
         metrics = {}
-        request_id = uuid4().hex
+        request_id = trajectory.get("request_id") if trajectory and trajectory.get("request_id") else uuid4().hex
         prompt_ids = await self.loop.run_in_executor(
             None, lambda: self.tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=True)
         )

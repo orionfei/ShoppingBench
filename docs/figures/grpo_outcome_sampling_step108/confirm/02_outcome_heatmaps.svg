@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1740" height="570" viewBox="0 0 1740 570">
+<rect width="100%" height="100%" fill="white"/>
+<title>Outcome heatmaps</title>
+<text x="295.0" y="30.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Paper ASR</text>
+<rect x="85.0" y="65.0" width="237.5" height="144.3" fill="#32748b" stroke="white" stroke-width="1"/>
+<text x="203.8" y="137.2" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.385</text>
+<rect x="322.5" y="65.0" width="237.5" height="144.3" fill="#eeeeee" stroke="white" stroke-width="1"/>
+<text x="441.2" y="137.2" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="middle">NA</text>
+<text x="77.0" y="137.2" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.6</text>
+<rect x="85.0" y="209.3" width="237.5" height="144.3" fill="#eeeeee" stroke="white" stroke-width="1"/>
+<text x="203.8" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="middle">NA</text>
+<rect x="322.5" y="209.3" width="237.5" height="144.3" fill="#31698e" stroke="white" stroke-width="1"/>
+<text x="441.2" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.336</text>
+<text x="77.0" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.4</text>
+<rect x="85.0" y="353.7" width="237.5" height="144.3" fill="#eeeeee" stroke="white" stroke-width="1"/>
+<text x="203.8" y="425.8" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="middle">NA</text>
+<rect x="322.5" y="353.7" width="237.5" height="144.3" fill="#31698e" stroke="white" stroke-width="1"/>
+<text x="441.2" y="425.8" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.339</text>
+<text x="77.0" y="425.8" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.2</text>
+<text x="203.8" y="516.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.8</text>
+<text x="441.2" y="516.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.95</text>
+<text x="322.5" y="536.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">top-p</text>
+<text x="28.0" y="55.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#9aa5af" text-anchor="start" dominant-baseline="auto">temperature</text>
+<text x="865.0" y="30.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Terminal ASR</text>
+<rect x="655.0" y="65.0" width="237.5" height="144.3" fill="#32748b" stroke="white" stroke-width="1"/>
+<text x="773.8" y="137.2" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.385</text>
+<rect x="892.5" y="65.0" width="237.5" height="144.3" fill="#eeeeee" stroke="white" stroke-width="1"/>
+<text x="1011.2" y="137.2" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="middle">NA</text>
+<text x="647.0" y="137.2" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.6</text>
+<rect x="655.0" y="209.3" width="237.5" height="144.3" fill="#eeeeee" stroke="white" stroke-width="1"/>
+<text x="773.8" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="middle">NA</text>
+<rect x="892.5" y="209.3" width="237.5" height="144.3" fill="#31698e" stroke="white" stroke-width="1"/>
+<text x="1011.2" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.336</text>
+<text x="647.0" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.4</text>
+<rect x="655.0" y="353.7" width="237.5" height="144.3" fill="#eeeeee" stroke="white" stroke-width="1"/>
+<text x="773.8" y="425.8" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="middle">NA</text>
+<rect x="892.5" y="353.7" width="237.5" height="144.3" fill="#31698e" stroke="white" stroke-width="1"/>
+<text x="1011.2" y="425.8" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.339</text>
+<text x="647.0" y="425.8" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.2</text>
+<text x="773.8" y="516.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.8</text>
+<text x="1011.2" y="516.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.95</text>
+<text x="892.5" y="536.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">top-p</text>
+<text x="598.0" y="55.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#9aa5af" text-anchor="start" dominant-baseline="auto">temperature</text>
+<text x="1435.0" y="30.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Terminal pass@G</text>
+<rect x="1225.0" y="65.0" width="237.5" height="144.3" fill="#4ebd6e" stroke="white" stroke-width="1"/>
+<text x="1343.8" y="137.2" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="middle">0.708</text>
+<rect x="1462.5" y="65.0" width="237.5" height="144.3" fill="#eeeeee" stroke="white" stroke-width="1"/>
+<text x="1581.2" y="137.2" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="middle">NA</text>
+<text x="1217.0" y="137.2" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.6</text>
+<rect x="1225.0" y="209.3" width="237.5" height="144.3" fill="#eeeeee" stroke="white" stroke-width="1"/>
+<text x="1343.8" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="middle">NA</text>
+<rect x="1462.5" y="209.3" width="237.5" height="144.3" fill="#35b27a" stroke="white" stroke-width="1"/>
+<text x="1581.2" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.646</text>
+<text x="1217.0" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.4</text>
+<rect x="1225.0" y="353.7" width="237.5" height="144.3" fill="#eeeeee" stroke="white" stroke-width="1"/>
+<text x="1343.8" y="425.8" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="middle">NA</text>
+<rect x="1462.5" y="353.7" width="237.5" height="144.3" fill="#34a87d" stroke="white" stroke-width="1"/>
+<text x="1581.2" y="425.8" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.604</text>
+<text x="1217.0" y="425.8" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.2</text>
+<text x="1343.8" y="516.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.8</text>
+<text x="1581.2" y="516.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.95</text>
+<text x="1462.5" y="536.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">top-p</text>
+<text x="1168.0" y="55.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#9aa5af" text-anchor="start" dominant-baseline="auto">temperature</text>
+</svg>

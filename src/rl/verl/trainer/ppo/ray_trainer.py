@@ -19,7 +19,9 @@ This trainer supports model-agonistic model initialization with huggingface
 """
 
 import json
+import math
 import os
+import time
 import uuid
 from collections import defaultdict
 from copy import deepcopy
@@ -62,6 +64,26 @@ from verl.utils.torch_functional import masked_mean
 from verl.utils.tracking import ValidationGenerationsLogger
 
 WorkerType = type[Worker]
+
+
+def mixed_group_selection(uids, outcomes, group_size: int, max_groups: int | None = None):
+    """Return row indices for mixed binary-reward groups and per-group states."""
+    uids = np.asarray(uids, dtype=object)
+    outcomes = np.asarray(outcomes, dtype=float)
+    ordered_uids = list(dict.fromkeys(uids.tolist()))
+    keep_uids = []
+    states = {}
+    for uid in ordered_uids:
+        values = outcomes[uids == uid]
+        if len(values) != group_size:
+            raise ValueError(f"group {uid} has {len(values)} rows, expected {group_size}")
+        successes = int(np.sum(values >= 1.0 - 1e-9))
+        state = "all_fail" if successes == 0 else "all_success" if successes == group_size else "mixed"
+        states[uid] = state
+        if state == "mixed" and (max_groups is None or len(keep_uids) < max_groups):
+            keep_uids.append(uid)
+    indices = np.flatnonzero(np.isin(uids, np.asarray(keep_uids, dtype=object)))
+    return indices, states
 
 
 class Role(Enum):
@@ -663,6 +685,144 @@ class RayPPOTrainer:
 
         print(f"Dumped generations to {filename}")
 
+    def _dynamic_sampling_enabled(self) -> bool:
+        config = self.config.algorithm.get("filter_groups", None)
+        return bool(config is not None and config.get("enable", False))
+
+    def _generate_and_score_dynamic_batch(self, batch_dict, timing_raw):
+        """Collect a fixed number of mixed GRPO groups before log-prob work.
+
+        ``data.gen_batch_size`` supplies up to ``max_num_gen_batches`` prompt
+        chunks in one dataloader item.  Chunks are generated sequentially and
+        generation stops as soon as ``data.train_batch_size`` mixed groups are
+        available.  All-equal groups are dumped for diagnosis but never reach
+        old-log-prob, advantage, or actor update.
+        """
+        filter_config = self.config.algorithm.filter_groups
+        metric_name = str(filter_config.get("metric") or "terminal_asr")
+        max_batches = int(filter_config.get("max_num_gen_batches", 0))
+        target_groups = int(self.config.data.train_batch_size)
+        chunk_groups = int(self.config.data.get("dynamic_sampling_gen_batch_size", target_groups))
+        group_size = int(self.config.actor_rollout_ref.rollout.n)
+        source = DataProto.from_single_dict(batch_dict)
+        if len(source) < target_groups:
+            raise RuntimeError(f"dynamic sampling source batch {len(source)} < target {target_groups}")
+        max_batches = max_batches if max_batches > 0 else math.ceil(len(source) / chunk_groups)
+
+        accepted_batches = []
+        accepted_groups = 0
+        raw_batches = []
+        raw_extra_keys = set()
+        group_states = {"all_fail": 0, "mixed": 0, "all_success": 0}
+        generated_groups = 0
+        generation_batches = 0
+        gen_seconds = 0.0
+        reward_seconds = 0.0
+
+        for batch_index, start in enumerate(range(0, len(source), chunk_groups)):
+            if batch_index >= max_batches or accepted_groups >= target_groups:
+                break
+            prompt_batch = source.slice(start, min(start + chunk_groups, len(source)))
+            prompt_batch.non_tensor_batch["uid"] = np.array(
+                [str(uuid.uuid4()) for _ in range(len(prompt_batch))], dtype=object
+            )
+            batch_keys_to_pop = ["input_ids", "attention_mask", "position_ids"]
+            non_tensor_batch_keys_to_pop = ["raw_prompt_ids"]
+            for key in ("multi_modal_data", "raw_prompt", "tools_kwargs", "interaction_kwargs", "index", "agent_name"):
+                if key in prompt_batch.non_tensor_batch:
+                    non_tensor_batch_keys_to_pop.append(key)
+            gen_batch = prompt_batch.pop(
+                batch_keys=batch_keys_to_pop,
+                non_tensor_batch_keys=non_tensor_batch_keys_to_pop,
+            )
+            gen_batch.meta_info["global_steps"] = self.global_steps
+            gen_batch = gen_batch.repeat(repeat_times=group_size, interleave=True)
+            started = time.perf_counter()
+            if not self.async_rollout_mode:
+                generated = self.actor_rollout_wg.generate_sequences(gen_batch)
+            else:
+                generated = self.async_rollout_manager.generate_sequences(gen_batch)
+            gen_seconds += time.perf_counter() - started
+            generated.meta_info.pop("timing", None)
+
+            prompt_batch = prompt_batch.repeat(repeat_times=group_size, interleave=True)
+            prompt_batch = prompt_batch.union(generated)
+            prompt_batch.meta_info["global_steps"] = self.global_steps
+            prompt_batch.meta_info["total_training_steps"] = self.total_training_steps
+            if "response_mask" not in prompt_batch.batch:
+                prompt_batch.batch["response_mask"] = compute_response_mask(prompt_batch)
+            started = time.perf_counter()
+            reward_tensor, extra = compute_reward(prompt_batch, self.reward_fn)
+            reward_seconds += time.perf_counter() - started
+            prompt_batch.batch["token_level_scores"] = reward_tensor
+            prompt_batch.batch["token_level_rewards"] = reward_tensor
+            if extra:
+                prompt_batch.non_tensor_batch.update({key: np.array(value) for key, value in extra.items()})
+                raw_extra_keys.update(extra)
+            raw_batches.append(prompt_batch)
+            generation_batches += 1
+
+            uid_values = prompt_batch.non_tensor_batch["uid"]
+            if metric_name in prompt_batch.non_tensor_batch:
+                outcomes = np.asarray(prompt_batch.non_tensor_batch[metric_name], dtype=float)
+            else:
+                outcomes = prompt_batch.batch["token_level_scores"].sum(-1).detach().cpu().numpy()
+            remaining = target_groups - accepted_groups
+            indices, states = mixed_group_selection(uid_values, outcomes, group_size, max_groups=remaining)
+            generated_groups += len(states)
+            for state in states.values():
+                group_states[state] += 1
+            if len(indices):
+                accepted_batches.append(prompt_batch.select_idxs(indices))
+                accepted_groups += len(set(uid_values[indices].tolist()))
+
+        raw = DataProto.concat(raw_batches)
+        raw_dir = self.config.trainer.get("rollout_data_dir", None)
+        if raw_dir:
+            inputs = self.tokenizer.batch_decode(raw.batch["prompts"], skip_special_tokens=True)
+            outputs = self.tokenizer.batch_decode(raw.batch["responses"], skip_special_tokens=True)
+            scores = raw.batch["token_level_scores"].sum(-1).cpu().tolist()
+            raw_extra = {
+                key: raw.non_tensor_batch[key].tolist()
+                for key in raw_extra_keys
+                if key in raw.non_tensor_batch
+            }
+            _indices, raw_states = mixed_group_selection(
+                raw.non_tensor_batch["uid"],
+                np.asarray(raw.non_tensor_batch.get(metric_name, scores), dtype=float),
+                group_size,
+            )
+            raw_extra["dynamic_group_state"] = [raw_states[uid] for uid in raw.non_tensor_batch["uid"]]
+            self._dump_generations(inputs, outputs, scores, raw_extra, os.path.join(raw_dir, "raw_dynamic"))
+
+        acceptance = accepted_groups / generated_groups if generated_groups else 0.0
+        metrics = {
+            "dynamic_sampling/generated_groups": generated_groups,
+            "dynamic_sampling/accepted_groups": accepted_groups,
+            "dynamic_sampling/acceptance_rate": acceptance,
+            "dynamic_sampling/all_fail_groups": group_states["all_fail"],
+            "dynamic_sampling/mixed_groups": group_states["mixed"],
+            "dynamic_sampling/all_success_groups": group_states["all_success"],
+            "dynamic_sampling/generation_batches": generation_batches,
+            "dynamic_sampling/raw_trajectories": len(raw),
+            "dynamic_sampling/gen_seconds": gen_seconds,
+            "dynamic_sampling/reward_seconds": reward_seconds,
+        }
+        timing_raw["gen"] = gen_seconds
+        timing_raw["reward"] = reward_seconds
+        if accepted_groups < target_groups:
+            return None, {}, metrics
+        accepted = DataProto.concat(accepted_batches)
+        accepted_uids = list(dict.fromkeys(accepted.non_tensor_batch["uid"].tolist()))[:target_groups]
+        indices = np.flatnonzero(np.isin(accepted.non_tensor_batch["uid"], np.asarray(accepted_uids, dtype=object)))
+        accepted = accepted.select_idxs(indices)
+        accepted_extra = {
+            key: accepted.non_tensor_batch[key].tolist()
+            for key in raw_extra_keys
+            if key in accepted.non_tensor_batch
+        }
+        return accepted, accepted_extra, metrics
+
     def _maybe_log_val_generations(self, inputs, outputs, scores):
         """Log a table of validation samples to the configured logger (wandb or swanlab)"""
 
@@ -1128,46 +1288,59 @@ class RayPPOTrainer:
                         if self.use_rm:
                             self.rm_wg.start_profile()
 
-                batch: DataProto = DataProto.from_single_dict(batch_dict)
-
-                # pop those keys for generation
-                batch_keys_to_pop = ["input_ids", "attention_mask", "position_ids"]
-                non_tensor_batch_keys_to_pop = ["raw_prompt_ids"]
-                if "multi_modal_data" in batch.non_tensor_batch:
-                    non_tensor_batch_keys_to_pop.append("multi_modal_data")
-                if "raw_prompt" in batch.non_tensor_batch:
-                    non_tensor_batch_keys_to_pop.append("raw_prompt")
-                if "tools_kwargs" in batch.non_tensor_batch:
-                    non_tensor_batch_keys_to_pop.append("tools_kwargs")
-                if "interaction_kwargs" in batch.non_tensor_batch:
-                    non_tensor_batch_keys_to_pop.append("interaction_kwargs")
-                if "index" in batch.non_tensor_batch:
-                    non_tensor_batch_keys_to_pop.append("index")
-                if "agent_name" in batch.non_tensor_batch:
-                    non_tensor_batch_keys_to_pop.append("agent_name")
-
-                gen_batch = batch.pop(
-                    batch_keys=batch_keys_to_pop,
-                    non_tensor_batch_keys=non_tensor_batch_keys_to_pop,
-                )
-
-                # pass global_steps to trace
-                gen_batch.meta_info["global_steps"] = self.global_steps
-                gen_batch = gen_batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
+                dynamic_sampling = self._dynamic_sampling_enabled()
+                reward_ready = False
+                if dynamic_sampling:
+                    batch, reward_extra_infos_dict, dynamic_metrics = self._generate_and_score_dynamic_batch(
+                        batch_dict, timing_raw
+                    )
+                    metrics.update(dynamic_metrics)
+                    if batch is None:
+                        misses = getattr(self, "_dynamic_sampling_consecutive_misses", 0) + 1
+                        self._dynamic_sampling_consecutive_misses = misses
+                        print(
+                            f"[dynamic-sampling] step={self.global_steps} buffer incomplete "
+                            f"accepted={dynamic_metrics['dynamic_sampling/accepted_groups']} "
+                            f"generated={dynamic_metrics['dynamic_sampling/generated_groups']} miss={misses}/2"
+                        )
+                        if misses >= 2:
+                            raise RuntimeError("dynamic sampling failed to fill two consecutive effective batches")
+                        continue
+                    self._dynamic_sampling_consecutive_misses = 0
+                    reward_tensor = batch.batch["token_level_scores"]
+                    reward_ready = True
+                else:
+                    batch = DataProto.from_single_dict(batch_dict)
+                    batch_keys_to_pop = ["input_ids", "attention_mask", "position_ids"]
+                    non_tensor_batch_keys_to_pop = ["raw_prompt_ids"]
+                    for key in (
+                        "multi_modal_data", "raw_prompt", "tools_kwargs", "interaction_kwargs", "index", "agent_name"
+                    ):
+                        if key in batch.non_tensor_batch:
+                            non_tensor_batch_keys_to_pop.append(key)
+                    gen_batch = batch.pop(
+                        batch_keys=batch_keys_to_pop,
+                        non_tensor_batch_keys=non_tensor_batch_keys_to_pop,
+                    )
+                    gen_batch.meta_info["global_steps"] = self.global_steps
+                    gen_batch = gen_batch.repeat(
+                        repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True
+                    )
 
                 is_last_step = self.global_steps >= self.total_training_steps
 
                 with marked_timer("step", timing_raw):
-                    # generate a batch
-                    with marked_timer("gen", timing_raw, color="red"):
-                        if not self.async_rollout_mode:
-                            gen_batch_output = self.actor_rollout_wg.generate_sequences(gen_batch)
-                        else:
-                            gen_batch_output = self.async_rollout_manager.generate_sequences(gen_batch)
-                        timing_raw.update(gen_batch_output.meta_info["timing"])
-                        gen_batch_output.meta_info.pop("timing", None)
+                    # generate a batch (dynamic sampling already generated and filtered above)
+                    if not dynamic_sampling:
+                        with marked_timer("gen", timing_raw, color="red"):
+                            if not self.async_rollout_mode:
+                                gen_batch_output = self.actor_rollout_wg.generate_sequences(gen_batch)
+                            else:
+                                gen_batch_output = self.async_rollout_manager.generate_sequences(gen_batch)
+                            timing_raw.update(gen_batch_output.meta_info["timing"])
+                            gen_batch_output.meta_info.pop("timing", None)
 
-                    if self.config.algorithm.adv_estimator == AdvantageEstimator.REMAX:
+                    if not dynamic_sampling and self.config.algorithm.adv_estimator == AdvantageEstimator.REMAX:
                         with marked_timer("gen_max", timing_raw, color="purple"):
                             gen_baseline_batch = deepcopy(gen_batch)
                             gen_baseline_batch.meta_info["do_sample"] = False
@@ -1183,14 +1356,14 @@ class RayPPOTrainer:
 
                             del gen_baseline_batch, gen_baseline_output
 
-                    batch.non_tensor_batch["uid"] = np.array(
-                        [str(uuid.uuid4()) for _ in range(len(batch.batch))], dtype=object
-                    )
-                    # repeat to align with repeated responses in rollout
-                    batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
-                    batch = batch.union(gen_batch_output)
-                    batch.meta_info["global_steps"] = self.global_steps
-                    batch.meta_info["total_training_steps"] = self.total_training_steps
+                    if not dynamic_sampling:
+                        batch.non_tensor_batch["uid"] = np.array(
+                            [str(uuid.uuid4()) for _ in range(len(batch.batch))], dtype=object
+                        )
+                        batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
+                        batch = batch.union(gen_batch_output)
+                        batch.meta_info["global_steps"] = self.global_steps
+                        batch.meta_info["total_training_steps"] = self.total_training_steps
 
                     if "response_mask" not in batch.batch.keys():
                         batch.batch["response_mask"] = compute_response_mask(batch)
@@ -1202,16 +1375,26 @@ class RayPPOTrainer:
                     if self.config.trainer.balance_batch:
                         self._balance_batch(batch, metrics=metrics)
 
+                    if reward_ready:
+                        reward_extra_infos_dict = {
+                            key: batch.non_tensor_batch[key].tolist()
+                            for key in reward_extra_infos_dict
+                            if key in batch.non_tensor_batch
+                        }
+                        reward_tensor = batch.batch["token_level_scores"]
+
                     # compute global_valid tokens
                     batch.meta_info["global_token_num"] = torch.sum(batch.batch["attention_mask"], dim=-1).tolist()
 
                     with marked_timer("reward", timing_raw, color="yellow"):
                         # compute reward model score
-                        if self.use_rm:
+                        if self.use_rm and not reward_ready:
                             reward_tensor = self.rm_wg.compute_rm_score(batch)
                             batch = batch.union(reward_tensor)
 
-                        if self.config.reward_model.launch_reward_fn_async:
+                        if reward_ready:
+                            pass
+                        elif self.config.reward_model.launch_reward_fn_async:
                             future_reward = compute_reward_async.remote(batch, self.config, self.tokenizer)
                         else:
                             reward_tensor, reward_extra_infos_dict = compute_reward(batch, self.reward_fn)
@@ -1270,7 +1453,7 @@ class RayPPOTrainer:
                     with marked_timer("adv", timing_raw, color="brown"):
                         # we combine with rule-based rm
                         reward_extra_infos_dict: dict[str, list]
-                        if self.config.reward_model.launch_reward_fn_async:
+                        if not reward_ready and self.config.reward_model.launch_reward_fn_async:
                             reward_tensor, reward_extra_infos_dict = ray.get(future_reward)
                         batch.batch["token_level_scores"] = reward_tensor
 
@@ -1337,8 +1520,14 @@ class RayPPOTrainer:
                     # validate
                     if (
                         self.val_reward_fn is not None
-                        and self.config.trainer.test_freq > 0
-                        and (is_last_step or self.global_steps % self.config.trainer.test_freq == 0)
+                        and (
+                            is_last_step
+                            or self.global_steps in set(self.config.trainer.get("test_steps", []) or [])
+                            or (
+                                self.config.trainer.test_freq > 0
+                                and self.global_steps % self.config.trainer.test_freq == 0
+                            )
+                        )
                     ):
                         with marked_timer("testing", timing_raw, color="green"):
                             val_metrics: dict = self._validate()
@@ -1360,6 +1549,7 @@ class RayPPOTrainer:
                     # 4. The ESI(Elastic Server Instance)/training plan is close to expiration.
                     if self.config.trainer.save_freq > 0 and (
                         is_last_step
+                        or self.global_steps in set(self.config.trainer.get("save_steps", []) or [])
                         or self.global_steps % self.config.trainer.save_freq == 0
                         or esi_close_to_expiration
                     ):

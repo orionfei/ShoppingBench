@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1030" viewBox="0 0 1400 1030">
+<rect width="100%" height="100%" fill="white"/>
+<title>Product-disjoint Test75: Step108 vs selected outcome-only GRPO</title>
+<text x="700.0" y="35.0" font-family="DejaVu Sans, sans-serif" font-size="23" fill="#243447" text-anchor="middle" dominant-baseline="auto">Product-disjoint Test75: Step108 vs selected outcome-only GRPO</text>
+<text x="355.0" y="80.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Outcome ASR</text>
+<polyline points="85.0,465.0 670.0,465.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="465.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0%</text>
+<polyline points="85.0,395.0 670.0,395.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="395.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">20%</text>
+<polyline points="85.0,325.0 670.0,325.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="325.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">40%</text>
+<polyline points="85.0,255.0 670.0,255.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="255.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">60%</text>
+<polyline points="85.0,185.0 670.0,185.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="185.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">80%</text>
+<polyline points="85.0,115.0 670.0,115.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="115.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">100%</text>
+<rect x="126.0" y="359.4" width="92.7" height="105.6" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="172.3" y="353.4" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">30.2%</text>
+<rect x="231.2" y="359.4" width="92.7" height="105.6" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="277.6" y="353.4" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">30.2%</text>
+<text x="231.2" y="487.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">Untouched Step108</text>
+<rect x="418.4" y="356.5" width="92.7" height="108.5" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="464.8" y="350.5" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">31.0%</text>
+<rect x="523.8" y="356.5" width="92.7" height="108.5" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="570.1" y="350.5" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">31.0%</text>
+<text x="523.8" y="487.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">Best GRPO</text>
+<rect x="85.0" y="502.0" width="13.0" height="13.0" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="104.0" y="509.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="start" dominant-baseline="auto">Paper ASR</text>
+<rect x="210.0" y="502.0" width="13.0" height="13.0" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="229.0" y="509.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="start" dominant-baseline="auto">Terminal ASR</text>
+<text x="1045.0" y="80.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Group-level success</text>
+<polyline points="775.0,465.0 1360.0,465.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="465.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0%</text>
+<polyline points="775.0,395.0 1360.0,395.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="395.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">20%</text>
+<polyline points="775.0,325.0 1360.0,325.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="325.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">40%</text>
+<polyline points="775.0,255.0 1360.0,255.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="255.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">60%</text>
+<polyline points="775.0,185.0 1360.0,185.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="185.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">80%</text>
+<polyline points="775.0,115.0 1360.0,115.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="115.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">100%</text>
+<rect x="816.0" y="259.7" width="92.7" height="205.3" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="862.3" y="253.7" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">58.7%</text>
+<rect x="921.2" y="278.3" width="92.7" height="186.7" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="967.6" y="272.3" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">53.3%</text>
+<text x="921.2" y="487.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">Untouched Step108</text>
+<rect x="1108.5" y="250.3" width="92.7" height="214.7" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="1154.8" y="244.3" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">61.3%</text>
+<rect x="1213.8" y="278.3" width="92.7" height="186.7" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="1260.1" y="272.3" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">53.3%</text>
+<text x="1213.8" y="487.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">Best GRPO</text>
+<rect x="775.0" y="502.0" width="13.0" height="13.0" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="794.0" y="509.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="start" dominant-baseline="auto">Pass@8</text>
+<rect x="900.0" y="502.0" width="13.0" height="13.0" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="919.0" y="509.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="start" dominant-baseline="auto">Mixed groups</text>
+<text x="355.0" y="565.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Response health</text>
+<polyline points="85.0,950.0 670.0,950.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="950.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0%</text>
+<polyline points="85.0,880.0 670.0,880.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="880.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">20%</text>
+<polyline points="85.0,810.0 670.0,810.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="810.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">40%</text>
+<polyline points="85.0,740.0 670.0,740.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="740.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">60%</text>
+<polyline points="85.0,670.0 670.0,670.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="670.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">80%</text>
+<polyline points="85.0,600.0 670.0,600.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="77.0" y="600.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">100%</text>
+<rect x="125.9" y="600.9" width="61.8" height="349.1" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="156.8" y="594.9" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">99.7%</text>
+<rect x="196.1" y="631.5" width="61.8" height="318.5" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="227.0" y="625.5" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">91.0%</text>
+<rect x="266.4" y="926.7" width="61.8" height="23.3" fill="#45a675" stroke="none" stroke-width="1"/>
+<text x="297.2" y="920.7" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">6.7%</text>
+<text x="231.2" y="972.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">Untouched Step108</text>
+<rect x="418.4" y="600.4" width="61.8" height="349.6" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="449.3" y="594.4" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">99.9%</text>
+<rect x="488.6" y="629.2" width="61.8" height="320.8" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="519.5" y="623.2" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">91.7%</text>
+<rect x="558.9" y="929.0" width="61.8" height="21.0" fill="#45a675" stroke="none" stroke-width="1"/>
+<text x="589.7" y="923.0" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">6.0%</text>
+<text x="523.8" y="972.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">Best GRPO</text>
+<rect x="85.0" y="987.0" width="13.0" height="13.0" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="104.0" y="994.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="start" dominant-baseline="auto">Format</text>
+<rect x="210.0" y="987.0" width="13.0" height="13.0" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="229.0" y="994.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="start" dominant-baseline="auto">Workflow</text>
+<rect x="335.0" y="987.0" width="13.0" height="13.0" fill="#45a675" stroke="none" stroke-width="1"/>
+<text x="354.0" y="994.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="start" dominant-baseline="auto">Truncation</text>
+<text x="1045.0" y="565.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Response token cost</text>
+<polyline points="775.0,950.0 1360.0,950.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="950.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0</text>
+<polyline points="775.0,880.0 1360.0,880.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="880.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">2355</text>
+<polyline points="775.0,810.0 1360.0,810.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="810.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">4710</text>
+<polyline points="775.0,740.0 1360.0,740.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="740.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">7066</text>
+<polyline points="775.0,670.0 1360.0,670.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="670.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">9421</text>
+<polyline points="775.0,600.0 1360.0,600.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="767.0" y="600.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">11776</text>
+<rect x="816.0" y="733.0" width="92.7" height="217.0" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="862.3" y="727.0" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">7302</text>
+<rect x="921.2" y="645.7" width="92.7" height="304.3" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="967.6" y="639.7" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">10240</text>
+<text x="921.2" y="972.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">Untouched Step108</text>
+<rect x="1108.5" y="736.4" width="92.7" height="213.6" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="1154.8" y="730.4" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">7188</text>
+<rect x="1213.8" y="645.7" width="92.7" height="304.3" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="1260.1" y="639.7" font-family="DejaVu Sans, sans-serif" font-size="10" fill="#243447" text-anchor="middle" dominant-baseline="auto">10240</text>
+<text x="1213.8" y="972.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">Best GRPO</text>
+<rect x="775.0" y="987.0" width="13.0" height="13.0" fill="#2878b5" stroke="none" stroke-width="1"/>
+<text x="794.0" y="994.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="start" dominant-baseline="auto">Mean</text>
+<rect x="900.0" y="987.0" width="13.0" height="13.0" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="919.0" y="994.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="start" dominant-baseline="auto">P95</text>
+</svg>

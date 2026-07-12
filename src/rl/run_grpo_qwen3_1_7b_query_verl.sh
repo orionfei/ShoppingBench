@@ -25,6 +25,10 @@ TRAIN_FILES="${TRAIN_FILES:-dataset/shoppingbench_query/train.parquet}"
 VAL_FILES="${VAL_FILES:-dataset/shoppingbench_query/test.parquet}"
 
 TRAIN_BATCH_SIZE="${TRAIN_BATCH_SIZE:-4}"
+GEN_BATCH_SIZE="${GEN_BATCH_SIZE:-$TRAIN_BATCH_SIZE}"
+DYNAMIC_SAMPLING_ENABLE="${DYNAMIC_SAMPLING_ENABLE:-False}"
+DYNAMIC_SAMPLING_METRIC="${DYNAMIC_SAMPLING_METRIC:-terminal_asr}"
+MAX_NUM_GEN_BATCHES="${MAX_NUM_GEN_BATCHES:-4}"
 VAL_BATCH_SIZE="${VAL_BATCH_SIZE:-4}"
 MAX_PROMPT_LENGTH="${MAX_PROMPT_LENGTH:-1024}"
 MAX_RESPONSE_LENGTH="${MAX_RESPONSE_LENGTH:-2048}"
@@ -35,9 +39,15 @@ PPO_MAX_TOKEN_LEN_PER_GPU="${PPO_MAX_TOKEN_LEN_PER_GPU:-10240}"
 ROLLOUT_MAX_NUM_BATCHED_TOKENS="${ROLLOUT_MAX_NUM_BATCHED_TOKENS:-6144}"
 ROLLOUT_MAX_MODEL_LEN="${ROLLOUT_MAX_MODEL_LEN:-6144}"
 ROLLOUT_MAX_NUM_SEQS="${ROLLOUT_MAX_NUM_SEQS:-8}"
+ROLLOUT_APPLY_MAX_NUM_SEQS="${ROLLOUT_APPLY_MAX_NUM_SEQS:-True}"
+ROLLOUT_ENABLE_PREFIX_CACHING="${ROLLOUT_ENABLE_PREFIX_CACHING:-True}"
 ROLLOUT_N="${ROLLOUT_N:-4}"
-ROLLOUT_TEMPERATURE="${ROLLOUT_TEMPERATURE:-1.0}"
-ROLLOUT_TOP_P="${ROLLOUT_TOP_P:-0.9}"
+LEGACY_ROLLOUT_TEMPERATURE="${ROLLOUT_TEMPERATURE:-}"
+LEGACY_ROLLOUT_TOP_P="${ROLLOUT_TOP_P:-}"
+TRAIN_ROLLOUT_TEMPERATURE="${TRAIN_ROLLOUT_TEMPERATURE:-${LEGACY_ROLLOUT_TEMPERATURE:-1.0}}"
+TRAIN_ROLLOUT_TOP_P="${TRAIN_ROLLOUT_TOP_P:-${LEGACY_ROLLOUT_TOP_P:-0.9}}"
+VAL_ROLLOUT_TEMPERATURE="${VAL_ROLLOUT_TEMPERATURE:-${LEGACY_ROLLOUT_TEMPERATURE:-0.2}}"
+VAL_ROLLOUT_TOP_P="${VAL_ROLLOUT_TOP_P:-${LEGACY_ROLLOUT_TOP_P:-0.9}}"
 ROLLOUT_GPU_MEMORY_UTILIZATION="${ROLLOUT_GPU_MEMORY_UTILIZATION:-0.38}"
 ROLLOUT_TENSOR_MODEL_PARALLEL_SIZE="${ROLLOUT_TENSOR_MODEL_PARALLEL_SIZE:-1}"
 ROLLOUT_ENFORCE_EAGER="${ROLLOUT_ENFORCE_EAGER:-False}"
@@ -49,6 +59,14 @@ if [[ "$ROLLOUT_NAME" == "vllm" && "$ROLLOUT_MODE" == "async" && "$VLLM_USE_V1" 
   export VLLM_USE_V1=1
 fi
 ROLLOUT_AGENT_NUM_WORKERS="${ROLLOUT_AGENT_NUM_WORKERS:-8}"
+STABLE_ROLLOUT_SAMPLING="${STABLE_ROLLOUT_SAMPLING:-True}"
+STABLE_ROLLOUT_SEED_REQUESTS="${STABLE_ROLLOUT_SEED_REQUESTS:-True}"
+STABLE_ROLLOUT_DETERMINISTIC_REQUEST_ID="${STABLE_ROLLOUT_DETERMINISTIC_REQUEST_ID:-True}"
+STABLE_ROLLOUT_STABLE_SERVER_ORDER="${STABLE_ROLLOUT_STABLE_SERVER_ORDER:-True}"
+STABLE_ROLLOUT_STABLE_SERVER_ROUTING="${STABLE_ROLLOUT_STABLE_SERVER_ROUTING:-True}"
+STABLE_ROLLOUT_SEED_BASE="${STABLE_ROLLOUT_SEED_BASE:-0}"
+STABLE_ROLLOUT_OFFSET_BASE="${STABLE_ROLLOUT_OFFSET_BASE:-0}"
+STABLE_ROLLOUT_FORCE_GENERATION_CONFIG_N1="${STABLE_ROLLOUT_FORCE_GENERATION_CONFIG_N1:-True}"
 MAX_ASSISTANT_TURNS="${MAX_ASSISTANT_TURNS:-null}"
 MAX_USER_TURNS="${MAX_USER_TURNS:-null}"
 MAX_PARALLEL_CALLS="${MAX_PARALLEL_CALLS:-4}"
@@ -89,6 +107,8 @@ VAL_ONLY="${VAL_ONLY:-False}"
 VAL_BEFORE_TRAIN="${VAL_BEFORE_TRAIN:-False}"
 ACTOR_CHECKPOINT_SAVE_CONTENTS="${ACTOR_CHECKPOINT_SAVE_CONTENTS:-['model','extra']}"
 ACTOR_CHECKPOINT_LOAD_CONTENTS="${ACTOR_CHECKPOINT_LOAD_CONTENTS:-$ACTOR_CHECKPOINT_SAVE_CONTENTS}"
+SHOPPINGBENCH_REWARD_MODE="${SHOPPINGBENCH_REWARD_MODE:-dense}"
+SHOPPINGBENCH_ASR_REWARD_PATH="${SHOPPINGBENCH_ASR_REWARD_PATH:-scripts/reward_shoppingbench_asr_batch.py}"
 
 export SHOPPINGBENCH_PROTOCOL_WEIGHT_START="${SHOPPINGBENCH_PROTOCOL_WEIGHT_START:-0.0}"
 export SHOPPINGBENCH_PROTOCOL_ANNEAL_STEPS="${SHOPPINGBENCH_PROTOCOL_ANNEAL_STEPS:-0}"
@@ -106,6 +126,33 @@ fi
 ACTOR_FSDP_MODEL_DTYPE_ARGS=()
 if [[ -n "$ACTOR_FSDP_MODEL_DTYPE" ]]; then
   ACTOR_FSDP_MODEL_DTYPE_ARGS=(+actor_rollout_ref.actor.fsdp_config.model_dtype="$ACTOR_FSDP_MODEL_DTYPE")
+fi
+
+CUSTOM_REWARD_ARGS=()
+case "$SHOPPINGBENCH_REWARD_MODE" in
+  asr_terminal)
+    CUSTOM_REWARD_ARGS=(
+      reward_model.reward_manager=batch
+      custom_reward_function.path="$SHOPPINGBENCH_ASR_REWARD_PATH"
+      custom_reward_function.name=compute_score
+    )
+    ;;
+  dense)
+    ;;
+  *)
+    echo "Unsupported SHOPPINGBENCH_REWARD_MODE: $SHOPPINGBENCH_REWARD_MODE" >&2
+    exit 2
+    ;;
+esac
+
+DYNAMIC_SAMPLING_ARGS=()
+if [[ "${DYNAMIC_SAMPLING_ENABLE,,}" == "true" ]]; then
+  DYNAMIC_SOURCE_BATCH_SIZE=$((GEN_BATCH_SIZE * MAX_NUM_GEN_BATCHES))
+  DYNAMIC_SAMPLING_ARGS=(
+    +data.gen_batch_size="$DYNAMIC_SOURCE_BATCH_SIZE"
+    +data.dynamic_sampling_gen_batch_size="$GEN_BATCH_SIZE"
+    "+algorithm.filter_groups={enable:true,metric:${DYNAMIC_SAMPLING_METRIC},max_num_gen_batches:${MAX_NUM_GEN_BATCHES}}"
+  )
 fi
 
 "$PYTHON_BIN" -m verl.trainer.main_ppo \
@@ -147,8 +194,8 @@ fi
   actor_rollout_ref.ref.fsdp_config.param_offload="$REF_PARAM_OFFLOAD" \
   actor_rollout_ref.rollout.name="$ROLLOUT_NAME" \
   actor_rollout_ref.rollout.mode="$ROLLOUT_MODE" \
-  actor_rollout_ref.rollout.temperature="$ROLLOUT_TEMPERATURE" \
-  actor_rollout_ref.rollout.top_p="$ROLLOUT_TOP_P" \
+  actor_rollout_ref.rollout.temperature="$TRAIN_ROLLOUT_TEMPERATURE" \
+  actor_rollout_ref.rollout.top_p="$TRAIN_ROLLOUT_TOP_P" \
   actor_rollout_ref.rollout.dtype=bfloat16 \
   actor_rollout_ref.rollout.enforce_eager="$ROLLOUT_ENFORCE_EAGER" \
   actor_rollout_ref.rollout.free_cache_engine="$ROLLOUT_FREE_CACHE_ENGINE" \
@@ -157,6 +204,8 @@ fi
   actor_rollout_ref.rollout.max_num_batched_tokens="$ROLLOUT_MAX_NUM_BATCHED_TOKENS" \
   actor_rollout_ref.rollout.max_model_len="$ROLLOUT_MAX_MODEL_LEN" \
   actor_rollout_ref.rollout.max_num_seqs="$ROLLOUT_MAX_NUM_SEQS" \
+  actor_rollout_ref.rollout.apply_max_num_seqs="$ROLLOUT_APPLY_MAX_NUM_SEQS" \
+  actor_rollout_ref.rollout.enable_prefix_caching="$ROLLOUT_ENABLE_PREFIX_CACHING" \
   actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu="$LOG_PROB_MICRO_BATCH_SIZE_PER_GPU" \
   actor_rollout_ref.rollout.n="$ROLLOUT_N" \
   actor_rollout_ref.rollout.multi_turn.enable=True \
@@ -175,9 +224,17 @@ fi
   +actor_rollout_ref.rollout.multi_turn.system_prompt_file="$SYSTEM_PROMPT_FILE" \
   actor_rollout_ref.rollout.multi_turn.tokenization_sanity_check_mode="$TOKENIZATION_SANITY_CHECK_MODE" \
   actor_rollout_ref.rollout.agent.num_workers="$ROLLOUT_AGENT_NUM_WORKERS" \
+  actor_rollout_ref.rollout.agent.stable_sampling.enabled="$STABLE_ROLLOUT_SAMPLING" \
+  actor_rollout_ref.rollout.agent.stable_sampling.seed_requests="$STABLE_ROLLOUT_SEED_REQUESTS" \
+  actor_rollout_ref.rollout.agent.stable_sampling.deterministic_request_id="$STABLE_ROLLOUT_DETERMINISTIC_REQUEST_ID" \
+  actor_rollout_ref.rollout.agent.stable_sampling.stable_server_order="$STABLE_ROLLOUT_STABLE_SERVER_ORDER" \
+  actor_rollout_ref.rollout.agent.stable_sampling.stable_server_routing="$STABLE_ROLLOUT_STABLE_SERVER_ROUTING" \
+  actor_rollout_ref.rollout.agent.stable_sampling.seed_base="$STABLE_ROLLOUT_SEED_BASE" \
+  actor_rollout_ref.rollout.agent.stable_sampling.rollout_offset_base="$STABLE_ROLLOUT_OFFSET_BASE" \
+  actor_rollout_ref.rollout.agent.stable_sampling.force_generation_config_n1="$STABLE_ROLLOUT_FORCE_GENERATION_CONFIG_N1" \
   actor_rollout_ref.rollout.val_kwargs.n="$ROLLOUT_N" \
-  actor_rollout_ref.rollout.val_kwargs.temperature="$ROLLOUT_TEMPERATURE" \
-  actor_rollout_ref.rollout.val_kwargs.top_p="$ROLLOUT_TOP_P" \
+  actor_rollout_ref.rollout.val_kwargs.temperature="$VAL_ROLLOUT_TEMPERATURE" \
+  actor_rollout_ref.rollout.val_kwargs.top_p="$VAL_ROLLOUT_TOP_P" \
   actor_rollout_ref.rollout.val_kwargs.do_sample=True \
   algorithm.use_kl_in_reward=False \
   algorithm.kl_ctrl.kl_coef=0.001 \
@@ -195,4 +252,6 @@ fi
   trainer.validation_data_dir="$VALIDATION_DATA_DIR" \
   trainer.val_only="$VAL_ONLY" \
   trainer.val_before_train="$VAL_BEFORE_TRAIN" \
+  "${DYNAMIC_SAMPLING_ARGS[@]}" \
+  "${CUSTOM_REWARD_ARGS[@]}" \
   "$@"

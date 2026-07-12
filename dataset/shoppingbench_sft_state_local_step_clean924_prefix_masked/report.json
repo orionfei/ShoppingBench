@@ -1,0 +1,921 @@
+{
+  "input": "data/tmp/teacher_gpt55medium_success_merged_20260709/clean_success_rollout.jsonl",
+  "manifest": "data/tmp/teacher_gpt55medium_success_merged_20260709/clean_success_manifest.jsonl",
+  "output_dir": "dataset/shoppingbench_sft_state_local_step_clean924_prefix_masked",
+  "model_name": "model/Qwen3-4B",
+  "trajectories": 924,
+  "all_step_rows": 3868,
+  "trainable_step_rows": 3659,
+  "masked_step_rows": 209,
+  "max_length": 22528,
+  "context_mode": "full_prefix",
+  "dropped_trainable_over_max_length": 0,
+  "mask_decision_replacement_searches": false,
+  "mask_reason_counts": {
+    "no_tool_call": 31,
+    "budget_check_not_within_budget": 85,
+    "selection_led_to_failure_feedback": 119,
+    "empty_find_product_result": 19,
+    "tool_error::find_product": 2,
+    "tool_error::budget_check": 1
+  },
+  "recovery_counts": {
+    "trainable_recovery_turn": 649
+  },
+  "tool_sequence_counts": {
+    "('find_product',)": 639,
+    "('view_product_information', 'budget_check')": 1384,
+    "('recommend_product', 'terminate')": 924,
+    "('find_product', 'find_product', 'find_product', 'find_product')": 261,
+    "()": 31,
+    "('find_product', 'find_product', 'find_product')": 314,
+    "('find_product', 'find_product')": 312,
+    "('find_product', 'find_product', 'find_product', 'find_product', 'find_product')": 2,
+    "('find_product', 'find_product', 'find_product', 'find_product', 'find_product', 'find_product')": 1
+  },
+  "token_length_all": {
+    "count": 3868,
+    "total": 14934261,
+    "min": 1565,
+    "mean": 3860.977507755946,
+    "p50": 3249.0,
+    "p90": 7095.100000000001,
+    "p95": 8339.2,
+    "p99": 11374.97,
+    "max": 20459
+  },
+  "token_length_trainable": {
+    "count": 3659,
+    "total": 14248354,
+    "min": 1565,
+    "mean": 3894.056846132823,
+    "p50": 3377.0,
+    "p90": 7158.5999999999985,
+    "p95": 8370.3,
+    "p99": 11408.720000000005,
+    "max": 20459
+  },
+  "splits": {
+    "train": {
+      "rows": 3469,
+      "token_length": {
+        "count": 3469,
+        "total": 13483353,
+        "min": 1565,
+        "mean": 3886.8126261170364,
+        "p50": 3366.0,
+        "p90": 7158.5999999999985,
+        "p95": 8371.8,
+        "p99": 11402.120000000012,
+        "max": 20459
+      },
+      "recovery_rows": 610
+    },
+    "test": {
+      "rows": 190,
+      "token_length": {
+        "count": 190,
+        "total": 765001,
+        "min": 1568,
+        "mean": 4026.321052631579,
+        "p50": 3575.0,
+        "p90": 7156.099999999997,
+        "p95": 8267.0,
+        "p99": 11125.050000000014,
+        "max": 12100
+      },
+      "recovery_rows": 39
+    }
+  },
+  "masked_examples": [
+    {
+      "trajectory_idx": 2,
+      "original_idx": 3,
+      "step_idx": 0,
+      "harness_state": "CANDIDATE_SEARCH",
+      "tool_sequence": [],
+      "mask_reasons": [
+        "no_tool_call"
+      ],
+      "next_state": "CANDIDATE_SEARCH"
+    },
+    {
+      "trajectory_idx": 4,
+      "original_idx": 6,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget",
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 6,
+      "original_idx": 11,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget",
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 6,
+      "original_idx": 11,
+      "step_idx": 3,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "find_product"
+      ],
+      "mask_reasons": [
+        "empty_find_product_result"
+      ],
+      "next_state": "CANDIDATE_SELECT"
+    },
+    {
+      "trajectory_idx": 6,
+      "original_idx": 11,
+      "step_idx": 4,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "find_product",
+        "find_product"
+      ],
+      "mask_reasons": [
+        "empty_find_product_result"
+      ],
+      "next_state": "CANDIDATE_SELECT"
+    },
+    {
+      "trajectory_idx": 15,
+      "original_idx": 26,
+      "step_idx": 2,
+      "harness_state": "DECISION",
+      "tool_sequence": [
+        "find_product"
+      ],
+      "mask_reasons": [
+        "empty_find_product_result"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 15,
+      "original_idx": 26,
+      "step_idx": 3,
+      "harness_state": "DECISION",
+      "tool_sequence": [
+        "find_product"
+      ],
+      "mask_reasons": [
+        "empty_find_product_result"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 26,
+      "original_idx": 48,
+      "step_idx": 2,
+      "harness_state": "DECISION",
+      "tool_sequence": [],
+      "mask_reasons": [
+        "no_tool_call"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 28,
+      "original_idx": 50,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 33,
+      "original_idx": 60,
+      "step_idx": 3,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 40,
+      "original_idx": 72,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget",
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 43,
+      "original_idx": 76,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget",
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 45,
+      "original_idx": 80,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 46,
+      "original_idx": 81,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 51,
+      "original_idx": 94,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 52,
+      "original_idx": 95,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 57,
+      "original_idx": 102,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 68,
+      "original_idx": 118,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 77,
+      "original_idx": 129,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 79,
+      "original_idx": 132,
+      "step_idx": 2,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 93,
+      "original_idx": 154,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget",
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 94,
+      "original_idx": 155,
+      "step_idx": 3,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 110,
+      "original_idx": 186,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 121,
+      "original_idx": 207,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget",
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 123,
+      "original_idx": 209,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 124,
+      "original_idx": 213,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 125,
+      "original_idx": 214,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 130,
+      "original_idx": 222,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 137,
+      "original_idx": 235,
+      "step_idx": 5,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 142,
+      "original_idx": 240,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 144,
+      "original_idx": 243,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget",
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 161,
+      "original_idx": 268,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget",
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 178,
+      "original_idx": 289,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 179,
+      "original_idx": 290,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget",
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 180,
+      "original_idx": 292,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget",
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 181,
+      "original_idx": 294,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 183,
+      "original_idx": 297,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 185,
+      "original_idx": 299,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "budget_check_not_within_budget",
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 187,
+      "original_idx": 301,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    },
+    {
+      "trajectory_idx": 190,
+      "original_idx": 306,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "mask_reasons": [
+        "selection_led_to_failure_feedback"
+      ],
+      "next_state": "DECISION"
+    }
+  ],
+  "recovery_examples": [
+    {
+      "trajectory_idx": 2,
+      "original_idx": 3,
+      "step_idx": 1,
+      "harness_state": "CANDIDATE_SEARCH",
+      "tool_sequence": [
+        "find_product",
+        "find_product",
+        "find_product"
+      ],
+      "state_failure_feedback": true,
+      "state_previous_decision": false,
+      "previous_step_masked": true
+    },
+    {
+      "trajectory_idx": 3,
+      "original_idx": 5,
+      "step_idx": 3,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 3,
+      "original_idx": 5,
+      "step_idx": 5,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 4,
+      "original_idx": 6,
+      "step_idx": 2,
+      "harness_state": "DECISION",
+      "tool_sequence": [
+        "find_product"
+      ],
+      "state_failure_feedback": true,
+      "state_previous_decision": false,
+      "previous_step_masked": true
+    },
+    {
+      "trajectory_idx": 4,
+      "original_idx": 6,
+      "step_idx": 3,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": true,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 6,
+      "original_idx": 11,
+      "step_idx": 2,
+      "harness_state": "DECISION",
+      "tool_sequence": [
+        "find_product"
+      ],
+      "state_failure_feedback": true,
+      "state_previous_decision": false,
+      "previous_step_masked": true
+    },
+    {
+      "trajectory_idx": 6,
+      "original_idx": 11,
+      "step_idx": 5,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "find_product"
+      ],
+      "state_failure_feedback": true,
+      "state_previous_decision": true,
+      "previous_step_masked": true
+    },
+    {
+      "trajectory_idx": 6,
+      "original_idx": 11,
+      "step_idx": 6,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": true,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 6,
+      "original_idx": 11,
+      "step_idx": 7,
+      "harness_state": "DECISION",
+      "tool_sequence": [
+        "recommend_product",
+        "terminate"
+      ],
+      "state_failure_feedback": true,
+      "state_previous_decision": false,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 7,
+      "original_idx": 12,
+      "step_idx": 3,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 9,
+      "original_idx": 15,
+      "step_idx": 3,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 9,
+      "original_idx": 15,
+      "step_idx": 5,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 14,
+      "original_idx": 21,
+      "step_idx": 3,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 15,
+      "original_idx": 26,
+      "step_idx": 4,
+      "harness_state": "DECISION",
+      "tool_sequence": [
+        "recommend_product",
+        "terminate"
+      ],
+      "state_failure_feedback": true,
+      "state_previous_decision": false,
+      "previous_step_masked": true
+    },
+    {
+      "trajectory_idx": 18,
+      "original_idx": 31,
+      "step_idx": 3,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 18,
+      "original_idx": 31,
+      "step_idx": 5,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 21,
+      "original_idx": 37,
+      "step_idx": 3,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 24,
+      "original_idx": 41,
+      "step_idx": 3,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 25,
+      "original_idx": 42,
+      "step_idx": 4,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    },
+    {
+      "trajectory_idx": 25,
+      "original_idx": 42,
+      "step_idx": 6,
+      "harness_state": "CANDIDATE_SELECT",
+      "tool_sequence": [
+        "view_product_information",
+        "budget_check"
+      ],
+      "state_failure_feedback": false,
+      "state_previous_decision": true,
+      "previous_step_masked": false
+    }
+  ],
+  "files": {
+    "all_steps_with_mask": "/root/project/ShoppingBench/dataset/shoppingbench_sft_state_local_step_clean924_prefix_masked/all_steps_with_mask.jsonl",
+    "trainable_steps": "/root/project/ShoppingBench/dataset/shoppingbench_sft_state_local_step_clean924_prefix_masked/trainable_steps.jsonl",
+    "train_parquet": "/root/project/ShoppingBench/dataset/shoppingbench_sft_state_local_step_clean924_prefix_masked/train.parquet",
+    "test_parquet": "/root/project/ShoppingBench/dataset/shoppingbench_sft_state_local_step_clean924_prefix_masked/test.parquet",
+    "report": "/root/project/ShoppingBench/dataset/shoppingbench_sft_state_local_step_clean924_prefix_masked/report.json"
+  }
+}

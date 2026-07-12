@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import math
 import os
 import random
@@ -69,6 +70,17 @@ PRODUCT_VOUCHER_JOINT_WEIGHTS = {
     (4, "platform"): 0.09,
     (4, "shop"): 0.21,
 }
+RL_V3_PRODUCT_VOUCHER_JOINT_WEIGHTS = {
+    (1, "platform"): 0.06,
+    (1, "shop"): 0.14,
+    (2, "platform"): 0.105,
+    (2, "shop"): 0.245,
+    (3, "platform"): 0.09,
+    (3, "shop"): 0.21,
+    (4, "platform"): 0.045,
+    (4, "shop"): 0.105,
+}
+RL_V3_CONSTRAINT_COMPLEXITY_WEIGHTS = {"low": 0.25, "medium": 0.50, "high": 0.25}
 DISCOUNT_TYPE_WEIGHTS = {"fixed": 0.40, "percentage": 0.60}
 DIFFICULTY_BUCKETS = {
     "easy": {
@@ -141,16 +153,27 @@ def expand_quota(quotas: dict):
     return values
 
 
-def build_sampling_specs(total: int):
-    product_voucher_pairs = expand_quota(largest_remainder_quota(total, PRODUCT_VOUCHER_JOINT_WEIGHTS))
+def build_sampling_specs(total: int, profile: str = "legacy"):
+    joint_weights = (
+        RL_V3_PRODUCT_VOUCHER_JOINT_WEIGHTS
+        if profile == "rl-v3-candidate"
+        else PRODUCT_VOUCHER_JOINT_WEIGHTS
+    )
+    product_voucher_pairs = expand_quota(largest_remainder_quota(total, joint_weights))
     discount_types = expand_quota(largest_remainder_quota(total, DISCOUNT_TYPE_WEIGHTS))
     difficulty_buckets = expand_quota(
         largest_remainder_quota(total, {k: v["weight"] for k, v in DIFFICULTY_BUCKETS.items()})
+    )
+    constraint_complexities = (
+        expand_quota(largest_remainder_quota(total, RL_V3_CONSTRAINT_COMPLEXITY_WEIGHTS))
+        if profile == "rl-v3-candidate"
+        else [None] * total
     )
 
     random.shuffle(product_voucher_pairs)
     random.shuffle(discount_types)
     random.shuffle(difficulty_buckets)
+    random.shuffle(constraint_complexities)
 
     specs = []
     for idx in range(total):
@@ -162,6 +185,7 @@ def build_sampling_specs(total: int):
                 "voucher_type": voucher_type,
                 "discount_type": discount_types[idx],
                 "difficulty_bucket": difficulty_buckets[idx],
+                "constraint_complexity": constraint_complexities[idx],
             }
         )
     return specs
@@ -308,7 +332,13 @@ def candidate_field_groups(product: dict):
     return groups
 
 
-def sample_target_field_count():
+def sample_target_field_count(constraint_complexity: str | None = None):
+    if constraint_complexity == "low":
+        return random.choices([1, 2], weights=[0.35, 0.65], k=1)[0], "low"
+    if constraint_complexity == "medium":
+        return random.choices([2, 3], weights=[0.45, 0.55], k=1)[0], "medium"
+    if constraint_complexity == "high":
+        return random.choices([3, 4, 5], weights=[0.30, 0.45, 0.25], k=1)[0], "high"
     roll = random.random()
     if roll < 0.10:
         return random.randint(5, 7), "hard"
@@ -317,11 +347,11 @@ def sample_target_field_count():
     return random.randint(3, 4), "standard"
 
 
-def sample_product_fields(product: dict):
+def sample_product_fields(product: dict, constraint_complexity: str | None = None):
     title = product.get("title")
     reward = {"product_id": product["product_id"], "title": [title]}
     requirements = [f"1. The `title` is `{title}`."]
-    target_count, field_bucket = sample_target_field_count()
+    target_count, field_bucket = sample_target_field_count(constraint_complexity)
     field_count = 1
     selected_keys = set()
 
@@ -373,6 +403,7 @@ def stage3_prompt(row: dict, opener_bucket: str):
         f"{opener_instruction}.\n"
         "Write the main query as a natural shopping request, not as a field checklist or rigid enumeration. "
         "For multiple products, connect them naturally with words like and, also, plus, or short sentences. "
+        "Paraphrase catalogue wording: never copy an entire product title verbatim into the query. "
         "A natural closing such as \"Please show me these products\" or \"Can you help me find these products?\" "
         "is allowed when it fits, but do not force one. "
         "Do not start with a generic phrase like \"I need a few different items\" unless it is "
@@ -390,7 +421,9 @@ def build_plan_item(
     requirement_list = []
     field_buckets = []
     for product in products:
-        product_reward, requirements, field_meta = sample_product_fields(product)
+        product_reward, requirements, field_meta = sample_product_fields(
+            product, spec.get("constraint_complexity")
+        )
         reward.append(product_reward)
         requirement_list.append(requirements)
         field_buckets.append(field_meta)
@@ -420,6 +453,7 @@ def build_plan_item(
             "voucher_type": spec["voucher_type"],
             "discount_type": spec["discount_type"],
             "difficulty_bucket": spec["difficulty_bucket"],
+            "constraint_complexity": spec.get("constraint_complexity"),
             "threshold_ratio": threshold_ratio,
             "budget_slack": budget_slack,
             "field_buckets": field_buckets,
@@ -507,6 +541,15 @@ def write_jsonl(path: Path, rows: list[dict]):
             fout.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def load_excluded_product_ids(path: str | None) -> set[str]:
+    if not path:
+        return set()
+    source = Path(path)
+    if not source.is_file():
+        raise FileNotFoundError(f"Excluded product-id file not found: {source}")
+    return {line.strip() for line in source.read_text(encoding="utf-8").splitlines() if line.strip()}
+
+
 def generate_plan(args):
     random.seed(args.seed)
     documents_file = Path(args.documents_file)
@@ -520,11 +563,12 @@ def generate_plan(args):
     if len(products) < 4:
         raise ValueError("Not enough products loaded for voucher sampling.")
 
-    specs = build_sampling_specs(args.total)
+    specs = build_sampling_specs(args.total, args.profile)
     total_sampled_products = sum(spec["n_products"] for spec in specs)
     title_only_limit = math.ceil(total_sampled_products * args.max_title_only_product_ratio)
     title_only_count = 0
-    used_product_ids = set()
+    excluded_product_ids = load_excluded_product_ids(args.exclude_product_ids_file)
+    used_product_ids = set(excluded_product_ids)
     rows = []
     attempts = 0
     pbar = tqdm(total=args.total, desc="Stage I/II plan")
@@ -565,7 +609,8 @@ def generate_plan(args):
     write_jsonl(Path(args.plan_output), rows)
     print(
         f"Wrote {len(rows)} plan rows to {args.plan_output} after {attempts} attempts. "
-        f"title-only products: {title_only_count}/{total_sampled_products}."
+        f"title-only products: {title_only_count}/{total_sampled_products}; "
+        f"excluded product ids: {len(excluded_product_ids)}."
     )
 
 
@@ -646,22 +691,22 @@ def generate_query(prompt: str, external: str, model_config: dict, base_url: str
             if query and query.strip():
                 query = query.strip()
                 if query == external or len(query) < 10:
-                    return None
-                return f"{query}\n\n{external}"
-            return None
+                    return None, content
+                return f"{query}\n\n{external}", content
+            return None, content
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, KeyError, ValueError) as exc:
             if attempt >= retries:
                 print(f"LLM request failed after {retries} attempts: {exc}", file=sys.stderr)
-                return None
+                return None, ""
             time.sleep(2 * attempt)
-    return None
+    return None, ""
 
 
 def load_completed_sample_ids(output: Path, metadata_output: Path, plan_rows: list[dict]):
     if metadata_output.is_file():
         completed = set()
         for row in load_jsonl(metadata_output):
-            if row.get("sample_id"):
+            if row.get("sample_id") and row.get("status", "accepted") == "accepted":
                 completed.add(row["sample_id"])
         return completed
     if output.is_file():
@@ -678,7 +723,7 @@ def append_jsonl(path: Path, row: dict):
 
 
 def generate_one_from_plan(row: dict, opener_bucket: str, model_config: dict, args):
-    query = generate_query(
+    query, raw_response = generate_query(
         stage3_prompt(row, opener_bucket),
         row["external_budget_and_voucher"],
         model_config,
@@ -688,7 +733,12 @@ def generate_one_from_plan(row: dict, opener_bucket: str, model_config: dict, ar
         args.llm_retries,
     )
     if not query:
-        return row["sample_id"], None, None
+        return row["sample_id"], None, {
+            "sample_id": row["sample_id"],
+            "model": model_config["model"],
+            "raw_response": raw_response,
+            "status": "failed",
+        }
     final = {"query": query, "reward": row["reward"], "voucher": row["voucher"]}
     validate_final_item(final)
     sampling_buckets = row["sampling_buckets"]
@@ -698,6 +748,12 @@ def generate_one_from_plan(row: dict, opener_bucket: str, model_config: dict, ar
         "difficulty_bucket": sampling_buckets["difficulty_bucket"],
         "threshold_ratio": sampling_buckets["threshold_ratio"],
         "budget_slack": sampling_buckets["budget_slack"],
+        "constraint_complexity": sampling_buckets.get("constraint_complexity"),
+        "model": model_config["model"],
+        "prompt_sha256": hashlib.sha256(stage3_prompt(row, opener_bucket).encode("utf-8")).hexdigest(),
+        "query_sha256": hashlib.sha256(query.encode("utf-8")).hexdigest(),
+        "raw_response": raw_response,
+        "status": "accepted",
     }
     return row["sample_id"], final, metadata
 
@@ -722,6 +778,8 @@ def generate_from_plan(args):
     metadata_output = Path(args.metadata_output) if args.metadata_output else Path(str(output) + ".meta.jsonl")
     completed = load_completed_sample_ids(output, metadata_output, rows)
     pending = [row for row in rows if row["sample_id"] not in completed]
+    if args.max_generate is not None:
+        pending = pending[: args.max_generate]
     opener_buckets = assign_opener_buckets(rows, args.opener_seed)
     print(f"Stage III pending rows: {len(pending)} / {len(rows)}")
 
@@ -736,6 +794,9 @@ def generate_from_plan(args):
             sample_id, final, metadata = future.result()
             if final is None:
                 failures.append(sample_id)
+                # Keep the provider response for diagnosis without marking the
+                # sample complete; a later invocation will retry this row.
+                append_jsonl(metadata_output, metadata)
             else:
                 append_jsonl(output, final)
                 append_jsonl(metadata_output, metadata)
@@ -771,6 +832,10 @@ def summarize_jsonl(path: Path, is_plan: bool):
         )
         print("discount types:", dict(Counter(row["voucher"]["discount_type"] for row in rows)))
         print("difficulty buckets:", dict(Counter(row["sampling_buckets"]["difficulty_bucket"] for row in rows)))
+        print(
+            "constraint complexities:",
+            dict(Counter(row["sampling_buckets"].get("constraint_complexity") for row in rows)),
+        )
         first = rows[0]
         preview = {
             "sample_id": first["sample_id"],
@@ -803,7 +868,10 @@ def parse_args():
     parser.add_argument("--max-docs", type=int, default=100000)
     parser.add_argument("--max-attempts-per-item", type=int, default=1000)
     parser.add_argument("--max-title-only-product-ratio", type=float, default=0.10)
+    parser.add_argument("--profile", choices=["legacy", "rl-v3-candidate"], default="legacy")
+    parser.add_argument("--exclude-product-ids-file", default=None)
     parser.add_argument("--concurrency", type=int, default=4)
+    parser.add_argument("--max-generate", type=int, default=None)
     parser.add_argument("--model-config", default=None)
     parser.add_argument("--model", default="mimo-v2.5")
     parser.add_argument("--base-url", default="https://token-plan-cn.xiaomimimo.com/v1")

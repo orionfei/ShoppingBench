@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="640" viewBox="0 0 1100 640">
+<rect width="100%" height="100%" fill="white"/>
+<title>Mixed-group bootstrap confidence intervals</title>
+<text x="550.0" y="35.0" font-family="DejaVu Sans, sans-serif" font-size="23" fill="#243447" text-anchor="middle" dominant-baseline="auto">Query bootstrap 95% confidence intervals</text>
+<polyline points="260.0,80.0 260.0,585.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="260.0" y="605.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.0</text>
+<polyline points="420.0,80.0 420.0,585.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="420.0" y="605.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.2</text>
+<polyline points="580.0,80.0 580.0,585.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="580.0" y="605.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.4</text>
+<polyline points="740.0,80.0 740.0,585.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="740.0" y="605.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.6</text>
+<polyline points="900.0,80.0 900.0,585.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="900.0" y="605.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.8</text>
+<polyline points="1060.0,80.0 1060.0,585.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="1060.0" y="605.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">1.0</text>
+<polyline points="410.0,96.8 810.0,96.8" fill="none" stroke="#9aa5af" stroke-width="3"/>
+<polyline points="410.0,91.8 410.0,101.8" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<polyline points="810.0,91.8 810.0,101.8" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<circle cx="610.0" cy="96.8" r="5.0" fill="#9aa5af" stroke="none"/>
+<text x="248.0" y="96.8" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.6/p0.95</text>
+<polyline points="460.0,130.5 860.0,130.5" fill="none" stroke="#9aa5af" stroke-width="3"/>
+<polyline points="460.0,125.5 460.0,135.5" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<polyline points="860.0,125.5 860.0,135.5" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<circle cx="660.0" cy="130.5" r="5.0" fill="#9aa5af" stroke="none"/>
+<text x="248.0" y="130.5" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T1.0/p0.9</text>
+<polyline points="510.0,164.2 910.0,164.2" fill="none" stroke="#2878b5" stroke-width="3"/>
+<polyline points="510.0,159.2 510.0,169.2" fill="none" stroke="#2878b5" stroke-width="2"/>
+<polyline points="910.0,159.2 910.0,169.2" fill="none" stroke="#2878b5" stroke-width="2"/>
+<circle cx="710.0" cy="164.2" r="5.0" fill="#2878b5" stroke="none"/>
+<text x="248.0" y="164.2" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.8/p0.8</text>
+<polyline points="510.0,197.8 910.0,197.8" fill="none" stroke="#2878b5" stroke-width="3"/>
+<polyline points="510.0,192.8 510.0,202.8" fill="none" stroke="#2878b5" stroke-width="2"/>
+<polyline points="910.0,192.8 910.0,202.8" fill="none" stroke="#2878b5" stroke-width="2"/>
+<circle cx="710.0" cy="197.8" r="5.0" fill="#2878b5" stroke="none"/>
+<text x="248.0" y="197.8" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.8/p0.95</text>
+<polyline points="510.0,231.5 910.0,231.5" fill="none" stroke="#9aa5af" stroke-width="3"/>
+<polyline points="510.0,226.5 510.0,236.5" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<polyline points="910.0,226.5 910.0,236.5" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<circle cx="710.0" cy="231.5" r="5.0" fill="#9aa5af" stroke="none"/>
+<text x="248.0" y="231.5" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T1.0/p0.8</text>
+<polyline points="560.0,265.2 960.0,265.2" fill="none" stroke="#2878b5" stroke-width="3"/>
+<polyline points="560.0,260.2 560.0,270.2" fill="none" stroke="#2878b5" stroke-width="2"/>
+<polyline points="960.0,260.2 960.0,270.2" fill="none" stroke="#2878b5" stroke-width="2"/>
+<circle cx="760.0" cy="265.2" r="5.0" fill="#2878b5" stroke="none"/>
+<text x="248.0" y="265.2" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.2/p0.9</text>
+<polyline points="560.0,298.8 960.0,298.8" fill="none" stroke="#2878b5" stroke-width="3"/>
+<polyline points="560.0,293.8 560.0,303.8" fill="none" stroke="#2878b5" stroke-width="2"/>
+<polyline points="960.0,293.8 960.0,303.8" fill="none" stroke="#2878b5" stroke-width="2"/>
+<circle cx="760.0" cy="298.8" r="5.0" fill="#2878b5" stroke="none"/>
+<text x="248.0" y="298.8" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.4/p0.8</text>
+<polyline points="560.0,332.5 960.0,332.5" fill="none" stroke="#9aa5af" stroke-width="3"/>
+<polyline points="560.0,327.5 560.0,337.5" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<polyline points="960.0,327.5 960.0,337.5" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<circle cx="760.0" cy="332.5" r="5.0" fill="#9aa5af" stroke="none"/>
+<text x="248.0" y="332.5" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.4/p0.9</text>
+<polyline points="560.0,366.2 960.0,366.2" fill="none" stroke="#2878b5" stroke-width="3"/>
+<polyline points="560.0,361.2 560.0,371.2" fill="none" stroke="#2878b5" stroke-width="2"/>
+<polyline points="960.0,361.2 960.0,371.2" fill="none" stroke="#2878b5" stroke-width="2"/>
+<circle cx="760.0" cy="366.2" r="5.0" fill="#2878b5" stroke="none"/>
+<text x="248.0" y="366.2" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.6/p0.9</text>
+<polyline points="560.0,399.8 960.0,399.8" fill="none" stroke="#9aa5af" stroke-width="3"/>
+<polyline points="560.0,394.8 560.0,404.8" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<polyline points="960.0,394.8 960.0,404.8" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<circle cx="760.0" cy="399.8" r="5.0" fill="#9aa5af" stroke="none"/>
+<text x="248.0" y="399.8" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T1.0/p0.95</text>
+<polyline points="610.0,433.5 960.0,433.5" fill="none" stroke="#9aa5af" stroke-width="3"/>
+<polyline points="610.0,428.5 610.0,438.5" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<polyline points="960.0,428.5 960.0,438.5" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<circle cx="810.0" cy="433.5" r="5.0" fill="#9aa5af" stroke="none"/>
+<text x="248.0" y="433.5" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.2/p0.8</text>
+<polyline points="610.0,467.2 960.0,467.2" fill="none" stroke="#2878b5" stroke-width="3"/>
+<polyline points="610.0,462.2 610.0,472.2" fill="none" stroke="#2878b5" stroke-width="2"/>
+<polyline points="960.0,462.2 960.0,472.2" fill="none" stroke="#2878b5" stroke-width="2"/>
+<circle cx="810.0" cy="467.2" r="5.0" fill="#2878b5" stroke="none"/>
+<text x="248.0" y="467.2" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.2/p0.95</text>
+<polyline points="610.0,500.8 960.0,500.8" fill="none" stroke="#2878b5" stroke-width="3"/>
+<polyline points="610.0,495.8 610.0,505.8" fill="none" stroke="#2878b5" stroke-width="2"/>
+<polyline points="960.0,495.8 960.0,505.8" fill="none" stroke="#2878b5" stroke-width="2"/>
+<circle cx="810.0" cy="500.8" r="5.0" fill="#2878b5" stroke="none"/>
+<text x="248.0" y="500.8" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.4/p0.95</text>
+<polyline points="610.0,534.5 960.0,534.5" fill="none" stroke="#2878b5" stroke-width="3"/>
+<polyline points="610.0,529.5 610.0,539.5" fill="none" stroke="#2878b5" stroke-width="2"/>
+<polyline points="960.0,529.5 960.0,539.5" fill="none" stroke="#2878b5" stroke-width="2"/>
+<circle cx="810.0" cy="534.5" r="5.0" fill="#2878b5" stroke="none"/>
+<text x="248.0" y="534.5" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.6/p0.8</text>
+<polyline points="610.0,568.2 960.0,568.2" fill="none" stroke="#9aa5af" stroke-width="3"/>
+<polyline points="610.0,563.2 610.0,573.2" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<polyline points="960.0,563.2 960.0,573.2" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<circle cx="810.0" cy="568.2" r="5.0" fill="#9aa5af" stroke="none"/>
+<text x="248.0" y="568.2" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.8/p0.9</text>
+</svg>

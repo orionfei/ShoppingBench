@@ -81,6 +81,7 @@ class MultiTurnSFTDataset(Dataset):
         self.messages_key = multiturn_config.get("messages_key", "messages")
         self.tools_key = multiturn_config.get("tools_key", "tools")
         self.enable_thinking_key = multiturn_config.get("enable_thinking_key", "enable_thinking")
+        self.assistant_loss_mask_key = multiturn_config.get("assistant_loss_mask_key", "assistant_loss_mask")
         assert self.truncation in ["error", "left", "right"]
 
         if not isinstance(parquet_files, list):
@@ -132,6 +133,13 @@ class MultiTurnSFTDataset(Dataset):
             self.enable_thinking = self.dataframe[self.enable_thinking_key].tolist()
         else:
             self.enable_thinking = None
+
+        if self.assistant_loss_mask_key in self.dataframe.columns:
+            self.assistant_loss_masks = (
+                self.dataframe[self.assistant_loss_mask_key].apply(convert_nested_value_to_list_recursive).tolist()
+            )
+        else:
+            self.assistant_loss_masks = None
 
     def __len__(self):
         return len(self.messages)
@@ -288,6 +296,7 @@ class MultiTurnSFTDataset(Dataset):
         messages = self.messages[item]
         tools = self.tools[item] if self.tools is not None else None
         enable_thinking = self.enable_thinking[item] if self.enable_thinking is not None else None
+        assistant_loss_mask = self.assistant_loss_masks[item] if self.assistant_loss_masks is not None else None
 
         if self.tools is not None:
             tools = self.tools[item]
@@ -321,6 +330,7 @@ class MultiTurnSFTDataset(Dataset):
         concat_attention_mask = []
 
         i = 0
+        assistant_idx = 0
         while i < len(messages):
             cur_messages = messages[i]
             if cur_messages["role"] == "assistant":
@@ -328,6 +338,15 @@ class MultiTurnSFTDataset(Dataset):
                 tokens, loss_mask, attention_mask = self._process_message_tokens(
                     messages, i, i + 1, is_assistant=True, enable_thinking=enable_thinking, tools=tools
                 )
+                if assistant_loss_mask is not None:
+                    if assistant_idx >= len(assistant_loss_mask):
+                        raise ValueError(
+                            f"assistant_loss_mask is shorter than assistant messages: "
+                            f"{len(assistant_loss_mask)=}, {assistant_idx=}, {messages=}"
+                        )
+                    if not bool(assistant_loss_mask[assistant_idx]):
+                        loss_mask = [0] * len(loss_mask)
+                    assistant_idx += 1
                 concat_tokens.extend(tokens)
                 concat_loss_mask.extend(loss_mask)
                 concat_attention_mask.extend(attention_mask)
@@ -358,6 +377,12 @@ class MultiTurnSFTDataset(Dataset):
                 i += 1
             else:
                 raise ValueError(f"Unknown role: {cur_messages['role']}")
+
+        if assistant_loss_mask is not None and assistant_idx != len(assistant_loss_mask):
+            raise ValueError(
+                f"assistant_loss_mask length does not match assistant messages: "
+                f"{len(assistant_loss_mask)=}, {assistant_idx=}, {messages=}"
+            )
 
         # Validate and convert tokens
         input_ids, loss_mask, attention_mask = self._validate_and_convert_tokens(

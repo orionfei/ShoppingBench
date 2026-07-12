@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+<rect width="1200" height="720" fill="#f7f8fb"/>
+<text x="40" y="52" font-family="DejaVu Sans, Arial" font-size="28" font-weight="700" fill="#172033">SFT checkpoint probe: 8 test queries x G=4</text>
+<text x="40" y="82" font-family="DejaVu Sans, Arial" font-size="16" fill="#687385">temperature=0.2, max turns=15, response=10240; highlighted best overall checkpoint is global_step_108.</text>
+<rect x="40" y="95" width="1120" height="370" rx="12" fill="white"/>
+<line x1="90" y1="420.0" x2="1120" y2="420.0" stroke="#d9dee8"/>
+<text x="76" y="425.0" text-anchor="end" font-family="DejaVu Sans, Arial" font-size="13" fill="#687385">0.0</text>
+<line x1="90" y1="358.0" x2="1120" y2="358.0" stroke="#d9dee8"/>
+<text x="76" y="363.0" text-anchor="end" font-family="DejaVu Sans, Arial" font-size="13" fill="#687385">0.2</text>
+<line x1="90" y1="296.0" x2="1120" y2="296.0" stroke="#d9dee8"/>
+<text x="76" y="301.0" text-anchor="end" font-family="DejaVu Sans, Arial" font-size="13" fill="#687385">0.4</text>
+<line x1="90" y1="234.0" x2="1120" y2="234.0" stroke="#d9dee8"/>
+<text x="76" y="239.0" text-anchor="end" font-family="DejaVu Sans, Arial" font-size="13" fill="#687385">0.6</text>
+<line x1="90" y1="172.0" x2="1120" y2="172.0" stroke="#d9dee8"/>
+<text x="76" y="177.0" text-anchor="end" font-family="DejaVu Sans, Arial" font-size="13" fill="#687385">0.8</text>
+<line x1="90" y1="110.0" x2="1120" y2="110.0" stroke="#d9dee8"/>
+<text x="76" y="115.0" text-anchor="end" font-family="DejaVu Sans, Arial" font-size="13" fill="#687385">1.0</text>
+<rect x="581.7" y="110" width="76" height="310" fill="#fff3c4"/>
+<polyline points="90.0,381.2 354.9,390.9 619.7,371.6 884.6,381.2 1120.0,371.6" fill="none" stroke="#207a4c" stroke-width="4"/>
+<circle cx="90.0" cy="381.2" r="5" fill="#207a4c" stroke="white" stroke-width="2"/>
+<circle cx="354.9" cy="390.9" r="5" fill="#207a4c" stroke="white" stroke-width="2"/>
+<circle cx="619.7" cy="371.6" r="5" fill="#207a4c" stroke="white" stroke-width="2"/>
+<circle cx="884.6" cy="381.2" r="5" fill="#207a4c" stroke="white" stroke-width="2"/>
+<circle cx="1120.0" cy="371.6" r="5" fill="#207a4c" stroke="white" stroke-width="2"/>
+<line x1="120" y1="448" x2="148" y2="448" stroke="#207a4c" stroke-width="5"/>
+<text x="156" y="453" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">Success</text>
+<polyline points="90.0,371.5 354.9,402.6 619.7,354.2 884.6,395.8 1120.0,395.1" fill="none" stroke="#2563eb" stroke-width="4"/>
+<circle cx="90.0" cy="371.5" r="5" fill="#2563eb" stroke="white" stroke-width="2"/>
+<circle cx="354.9" cy="402.6" r="5" fill="#2563eb" stroke="white" stroke-width="2"/>
+<circle cx="619.7" cy="354.2" r="5" fill="#2563eb" stroke="white" stroke-width="2"/>
+<circle cx="884.6" cy="395.8" r="5" fill="#2563eb" stroke="white" stroke-width="2"/>
+<circle cx="1120.0" cy="395.1" r="5" fill="#2563eb" stroke="white" stroke-width="2"/>
+<line x1="300" y1="448" x2="328" y2="448" stroke="#2563eb" stroke-width="5"/>
+<text x="336" y="453" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">Task</text>
+<polyline points="90.0,329.4 354.9,346.5 619.7,305.9 884.6,339.6 1120.0,344.2" fill="none" stroke="#c2410c" stroke-width="4"/>
+<circle cx="90.0" cy="329.4" r="5" fill="#c2410c" stroke="white" stroke-width="2"/>
+<circle cx="354.9" cy="346.5" r="5" fill="#c2410c" stroke="white" stroke-width="2"/>
+<circle cx="619.7" cy="305.9" r="5" fill="#c2410c" stroke="white" stroke-width="2"/>
+<circle cx="884.6" cy="339.6" r="5" fill="#c2410c" stroke="white" stroke-width="2"/>
+<circle cx="1120.0" cy="344.2" r="5" fill="#c2410c" stroke="white" stroke-width="2"/>
+<line x1="480" y1="448" x2="508" y2="448" stroke="#c2410c" stroke-width="5"/>
+<text x="516" y="453" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">Progress</text>
+<polyline points="90.0,170.9 354.9,177.1 619.7,149.4 884.6,162.0 1120.0,157.6" fill="none" stroke="#7c3aed" stroke-width="4"/>
+<circle cx="90.0" cy="170.9" r="5" fill="#7c3aed" stroke="white" stroke-width="2"/>
+<circle cx="354.9" cy="177.1" r="5" fill="#7c3aed" stroke="white" stroke-width="2"/>
+<circle cx="619.7" cy="149.4" r="5" fill="#7c3aed" stroke="white" stroke-width="2"/>
+<circle cx="884.6" cy="162.0" r="5" fill="#7c3aed" stroke="white" stroke-width="2"/>
+<circle cx="1120.0" cy="157.6" r="5" fill="#7c3aed" stroke="white" stroke-width="2"/>
+<line x1="660" y1="448" x2="688" y2="448" stroke="#7c3aed" stroke-width="5"/>
+<text x="696" y="453" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">Protocol</text>
+<text x="90.0" y="443" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">54</text>
+<text x="90.0" y="367.2" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="13" font-weight="700" fill="#207a4c">4/32</text>
+<text x="354.9" y="443" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">81</text>
+<text x="354.9" y="376.9" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="13" font-weight="700" fill="#207a4c">3/32</text>
+<text x="619.7" y="443" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">108</text>
+<text x="619.7" y="357.6" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="13" font-weight="700" fill="#207a4c">5/32</text>
+<text x="884.6" y="443" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">135</text>
+<text x="884.6" y="367.2" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="13" font-weight="700" fill="#207a4c">4/32</text>
+<text x="1120.0" y="443" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">159</text>
+<text x="1120.0" y="357.6" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="13" font-weight="700" fill="#207a4c">5/32</text>
+<text x="40" y="510" font-family="DejaVu Sans, Arial" font-size="22" font-weight="700" fill="#172033">Failure modes</text>
+<text x="125" y="690" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">54</text>
+<rect x="70" y="656.2" width="110" height="13.8" fill="#207a4c"/>
+<rect x="70" y="587.5" width="110" height="68.8" fill="#ef4444"/>
+<rect x="70" y="566.9" width="110" height="20.6" fill="#f59e0b"/>
+<rect x="70" y="563.4" width="110" height="3.4" fill="#8b5cf6"/>
+<rect x="70" y="560.0" width="110" height="3.4" fill="#64748b"/>
+<text x="335" y="690" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">81</text>
+<rect x="280" y="659.7" width="110" height="10.3" fill="#207a4c"/>
+<rect x="280" y="587.5" width="110" height="72.2" fill="#ef4444"/>
+<rect x="280" y="570.3" width="110" height="17.2" fill="#f59e0b"/>
+<rect x="280" y="560.0" width="110" height="10.3" fill="#8b5cf6"/>
+<rect x="280" y="560.0" width="110" height="0.0" fill="#64748b"/>
+<text x="545" y="690" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">108</text>
+<rect x="490" y="652.8" width="110" height="17.2" fill="#207a4c"/>
+<rect x="490" y="597.8" width="110" height="55.0" fill="#ef4444"/>
+<rect x="490" y="577.2" width="110" height="20.6" fill="#f59e0b"/>
+<rect x="490" y="563.4" width="110" height="13.8" fill="#8b5cf6"/>
+<rect x="490" y="560.0" width="110" height="3.4" fill="#64748b"/>
+<text x="755" y="690" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">135</text>
+<rect x="700" y="656.2" width="110" height="13.8" fill="#207a4c"/>
+<rect x="700" y="584.1" width="110" height="72.2" fill="#ef4444"/>
+<rect x="700" y="566.9" width="110" height="17.2" fill="#f59e0b"/>
+<rect x="700" y="563.4" width="110" height="3.4" fill="#8b5cf6"/>
+<rect x="700" y="560.0" width="110" height="3.4" fill="#64748b"/>
+<text x="965" y="690" text-anchor="middle" font-family="DejaVu Sans, Arial" font-size="15" fill="#687385">159</text>
+<rect x="910" y="652.8" width="110" height="17.2" fill="#207a4c"/>
+<rect x="910" y="594.4" width="110" height="58.4" fill="#ef4444"/>
+<rect x="910" y="577.2" width="110" height="17.2" fill="#f59e0b"/>
+<rect x="910" y="563.4" width="110" height="13.8" fill="#8b5cf6"/>
+<rect x="910" y="560.0" width="110" height="3.4" fill="#64748b"/>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="500" viewBox="0 0 1100 500">
+<rect width="100%" height="100%" fill="white"/>
+<title>Mixed-group bootstrap confidence intervals</title>
+<text x="550.0" y="35.0" font-family="DejaVu Sans, sans-serif" font-size="23" fill="#243447" text-anchor="middle" dominant-baseline="auto">Query bootstrap 95% confidence intervals</text>
+<polyline points="260.0,80.0 260.0,445.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="260.0" y="465.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.0</text>
+<polyline points="420.0,80.0 420.0,445.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="420.0" y="465.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.2</text>
+<polyline points="580.0,80.0 580.0,445.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="580.0" y="465.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.4</text>
+<polyline points="740.0,80.0 740.0,445.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="740.0" y="465.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.6</text>
+<polyline points="900.0,80.0 900.0,445.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="900.0" y="465.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.8</text>
+<polyline points="1060.0,80.0 1060.0,445.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="1060.0" y="465.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="middle" dominant-baseline="auto">1.0</text>
+<polyline points="560.0,171.2 960.0,171.2" fill="none" stroke="#9aa5af" stroke-width="3"/>
+<polyline points="560.0,166.2 560.0,176.2" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<polyline points="960.0,166.2 960.0,176.2" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<circle cx="760.0" cy="171.2" r="5.0" fill="#9aa5af" stroke="none"/>
+<text x="248.0" y="171.2" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.2/p0.9/s0</text>
+<polyline points="610.0,353.8 960.0,353.8" fill="none" stroke="#9aa5af" stroke-width="3"/>
+<polyline points="610.0,348.8 610.0,358.8" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<polyline points="960.0,348.8 960.0,358.8" fill="none" stroke="#9aa5af" stroke-width="2"/>
+<circle cx="810.0" cy="353.8" r="5.0" fill="#9aa5af" stroke="none"/>
+<text x="248.0" y="353.8" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">T0.2/p0.8/s0</text>
+</svg>

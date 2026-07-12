@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import hashlib
 import heapq
+import json
 import logging
 import os
 import random
@@ -39,6 +41,48 @@ logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
 
+def _as_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+
+def _stable_sampling_config(config: DictConfig):
+    agent_config = config.actor_rollout_ref.rollout.agent
+    return agent_config.get("stable_sampling", {}) or {}
+
+
+def _stable_sampling_enabled(config: DictConfig) -> bool:
+    return _as_bool(_stable_sampling_config(config).get("enabled", False))
+
+
+def _json_ready(value: Any) -> Any:
+    if isinstance(value, np.ndarray):
+        return _json_ready(value.tolist())
+    if isinstance(value, dict):
+        return {str(key): _json_ready(val) for key, val in sorted(value.items(), key=lambda item: str(item[0]))}
+    if isinstance(value, (list, tuple)):
+        return [_json_ready(item) for item in value]
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.floating):
+        return float(value)
+    if isinstance(value, np.bool_):
+        return bool(value)
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return repr(value)
+
+
+def _stable_fingerprint(value: Any) -> str:
+    payload = json.dumps(_json_ready(value), ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
 class AsyncLLMServerManager:
     """
     A class to manage multiple OpenAI compatible LLM servers. This class provides
@@ -56,10 +100,22 @@ class AsyncLLMServerManager:
         """
         self.config = config
         self.server_handles = server_handles
-        random.shuffle(self.server_handles)
+        stable_config = _stable_sampling_config(config)
+        self.stable_sampling_enabled = _stable_sampling_enabled(config)
+        self.stable_server_routing = self.stable_sampling_enabled and _as_bool(
+            stable_config.get("stable_server_routing", True)
+        )
+        if not (
+            self.stable_sampling_enabled
+            and _as_bool(stable_config.get("stable_server_order", True))
+        ):
+            random.shuffle(self.server_handles)
 
         # Least requests load balancing
-        self.weighted_serveres = [[0, (hash(server), server)] for server in server_handles]
+        tie_breaker = enumerate(self.server_handles) if self.stable_sampling_enabled else (
+            (hash(server), server) for server in server_handles
+        )
+        self.weighted_serveres = [[0, (idx, server)] for idx, server in tie_breaker]
         heapq.heapify(self.weighted_serveres)
 
         # LRU cache to map request_id to server
@@ -70,9 +126,15 @@ class AsyncLLMServerManager:
         if request_id in self.request_id_to_server:
             return self.request_id_to_server[request_id]
 
-        server = self.weighted_serveres[0][1][1]
-        self.weighted_serveres[0][0] += 1
-        heapq.heapreplace(self.weighted_serveres, self.weighted_serveres[0])
+        if self.stable_server_routing:
+            server_idx = int(hashlib.sha1(str(request_id).encode("utf-8")).hexdigest()[:8], 16) % len(
+                self.server_handles
+            )
+            server = self.server_handles[server_idx]
+        else:
+            server = self.weighted_serveres[0][1][1]
+            self.weighted_serveres[0][0] += 1
+            heapq.heapreplace(self.weighted_serveres, self.weighted_serveres[0])
         self.request_id_to_server[request_id] = server
         return server
 
@@ -149,7 +211,12 @@ class AgentLoopBase(ABC):
         cls._class_initialized = True
 
     @abstractmethod
-    async def run(self, messages: list[dict[str, Any]], sampling_params: dict[str, Any]) -> AgentLoopOutput:
+    async def run(
+        self,
+        messages: list[dict[str, Any]],
+        sampling_params: dict[str, Any],
+        trajectory: dict[str, Any] | None = None,
+    ) -> AgentLoopOutput:
         """Run agent loop to interact with LLM server and environment.
 
         Args:
@@ -235,7 +302,7 @@ class AgentLoopWorker:
         else:
             index = np.arange(len(raw_prompts))
 
-        trajectory_info = await get_trajectory_info(batch.meta_info.get("global_steps", -1), index)
+        trajectory_info = await get_trajectory_info(batch.meta_info.get("global_steps", -1), index, batch)
 
         for agent_name, messages, trajectory in zip(agent_names, raw_prompts, trajectory_info, strict=True):
             tasks.append(
@@ -258,7 +325,16 @@ class AgentLoopWorker:
         ):
             agent_loop_class = self.get_agent_loop_class(agent_name)
             agent_loop = agent_loop_class(self.config, self.server_manager, self.tokenizer)
-            output = await agent_loop.run(messages, sampling_params)
+            trajectory_sampling_params = dict(sampling_params)
+            stable_config = _stable_sampling_config(self.config)
+            if (
+                _stable_sampling_enabled(self.config)
+                and _as_bool(stable_config.get("seed_requests", True))
+                and self.config.actor_rollout_ref.rollout.name == "vllm"
+                and trajectory.get("rollout_seed") is not None
+            ):
+                trajectory_sampling_params["seed"] = int(trajectory["rollout_seed"])
+            output = await agent_loop.run(messages, trajectory_sampling_params, trajectory=trajectory)
             return output
 
     def get_agent_loop_class(self, agent_name: str) -> type[AgentLoopBase]:
@@ -357,8 +433,23 @@ class AgentLoopWorker:
         return DataProto(batch=batch, non_tensor_batch=non_tensor_batch, meta_info={"metrics": metrics})
 
 
-async def get_trajectory_info(step, index):
+async def get_trajectory_info(step, index, batch: DataProto | None = None):
     """Get the trajectory info (step, sample_index, rollout_n) asynchrously"""
+    if batch is not None and "__trajectory_rollout_n__" in batch.non_tensor_batch:
+        sample_index = batch.non_tensor_batch.get("__trajectory_sample_index__", index)
+        rollout_n = batch.non_tensor_batch["__trajectory_rollout_n__"]
+        request_id = batch.non_tensor_batch.get("__trajectory_request_id__")
+        rollout_seed = batch.non_tensor_batch.get("__trajectory_seed__")
+        trajectory_info = []
+        for i in range(len(rollout_n)):
+            item = {"step": step, "sample_index": sample_index[i], "rollout_n": int(rollout_n[i])}
+            if request_id is not None:
+                item["request_id"] = str(request_id[i])
+            if rollout_seed is not None:
+                item["rollout_seed"] = int(rollout_seed[i])
+            trajectory_info.append(item)
+        return trajectory_info
+
     trajectory_info = []
     rollout_n = 0
     for i in range(len(index)):
@@ -457,6 +548,8 @@ class AgentLoopManager:
         """
         if self.config.actor_rollout_ref.rollout.free_cache_engine:
             self.wake_up()
+        if _stable_sampling_enabled(self.config):
+            self._annotate_stable_sampling(prompts)
         chunkes = prompts.chunk(len(self.agent_loop_workers))
         outputs = ray.get(
             [
@@ -504,3 +597,47 @@ class AgentLoopManager:
     def sleep(self):
         """Sleep all rollout server instances."""
         ray.get([server.sleep.remote() for server in self.async_llm_servers])
+
+    def _annotate_stable_sampling(self, prompts: DataProto):
+        stable_config = _stable_sampling_config(self.config)
+        seed_base = int(stable_config.get("seed_base", 0))
+        rollout_offset_base = int(stable_config.get("rollout_offset_base", 0))
+        step = int(prompts.meta_info.get("global_steps", -1))
+
+        source_values = None
+        for key in ("raw_prompt_ids", "raw_prompt", "full_prompts", "index"):
+            if key in prompts.non_tensor_batch:
+                source_values = prompts.non_tensor_batch[key]
+                break
+        if source_values is None:
+            source_values = np.arange(len(prompts), dtype=object)
+
+        seen: dict[str, int] = {}
+        counters: dict[str, int] = {}
+        sample_indices = []
+        rollout_ns = []
+        rollout_seeds = []
+        request_ids = []
+
+        for value in source_values:
+            fingerprint = _stable_fingerprint(value)
+            sample_index = seen.setdefault(fingerprint, len(seen))
+            rollout_n_local = counters.get(fingerprint, 0)
+            counters[fingerprint] = rollout_n_local + 1
+            rollout_n = rollout_offset_base + rollout_n_local
+
+            fp_int = int(fingerprint[:16], 16)
+            seed = (seed_base + fp_int + max(step, 0) * 1009 + rollout_n * 1000003) % (2**32)
+
+            sample_indices.append(sample_index)
+            rollout_ns.append(rollout_n)
+            rollout_seeds.append(seed)
+            if _as_bool(stable_config.get("deterministic_request_id", True)):
+                request_ids.append(f"stable-{step}-{fingerprint[:16]}-{rollout_n}")
+            else:
+                request_ids.append("")
+
+        prompts.non_tensor_batch["__trajectory_sample_index__"] = np.array(sample_indices, dtype=object)
+        prompts.non_tensor_batch["__trajectory_rollout_n__"] = np.array(rollout_ns, dtype=np.int64)
+        prompts.non_tensor_batch["__trajectory_seed__"] = np.array(rollout_seeds, dtype=np.int64)
+        prompts.non_tensor_batch["__trajectory_request_id__"] = np.array(request_ids, dtype=object)

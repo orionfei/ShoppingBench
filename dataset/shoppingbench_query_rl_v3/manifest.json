@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "counts": {
+    "train": 1414,
+    "validation": 64,
+    "test": 250
+  },
+  "query_overlap": 0,
+  "product_overlap": 0,
+  "unique_products": {
+    "train": 3379,
+    "validation": 160,
+    "test": 714
+  },
+  "distribution": {
+    "train": {
+      "product_count": {
+        "1": 289,
+        "2": 496,
+        "4": 211,
+        "3": 418
+      },
+      "voucher_type": {
+        "shop": 988,
+        "platform": 426
+      },
+      "discount_type": {
+        "percentage": 849,
+        "fixed": 565
+      }
+    },
+    "validation": {
+      "product_count": {
+        "2": 16,
+        "1": 16,
+        "4": 16,
+        "3": 16
+      },
+      "voucher_type": {
+        "shop": 32,
+        "platform": 32
+      },
+      "discount_type": {
+        "fixed": 32,
+        "percentage": 32
+      }
+    },
+    "test": {
+      "product_count": {
+        "1": 22,
+        "4": 78,
+        "3": 80,
+        "2": 70
+      },
+      "voucher_type": {
+        "platform": 129,
+        "shop": 121
+      },
+      "discount_type": {
+        "fixed": 113,
+        "percentage": 137
+      }
+    }
+  },
+  "files": {
+    "train": {
+      "path": "dataset/shoppingbench_query_rl_v3/train.parquet",
+      "sha256": "c1d12dcb0c6dc088b381135f6b04633da564d4d039e23daa17cb12b6adb83997",
+      "bytes": 986047
+    },
+    "validation": {
+      "path": "dataset/shoppingbench_query_rl_v3/validation.parquet",
+      "sha256": "6f2eca5f0424f544d7ecd89e2fb2cbe55d866ee11f3916c2c7e7096498b046e8",
+      "bytes": 62049
+    },
+    "test": {
+      "path": "dataset/shoppingbench_query_rl_v3/test.parquet",
+      "sha256": "f15d11fdb60d7965d495b6247c759353f29b30befc3a356953940401d07e72d0",
+      "bytes": 213331
+    },
+    "product_cache": {
+      "path": "dataset/shoppingbench_query_rl_v3/product_cache.json",
+      "sha256": "5dbc14d81b5c56ae1fd017fa5dacffbc910b4f4bb8a7e89bf88cfbcf9acf1bc4",
+      "bytes": 4206688
+    },
+    "report": {
+      "path": "dataset/shoppingbench_query_rl_v3/report.json",
+      "sha256": "70ff7e13898e27e2245edac305771ee56e012e26a507ec8568dd35a73b61978b"
+    }
+  }
+}

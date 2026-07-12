@@ -1,0 +1,86 @@
+{
+  "objective": "historical RL 300+450 queries split for RL training and validation, excluding current SFT queries",
+  "split_policy": {
+    "seed": 20260709,
+    "query_val_size": 0.1,
+    "train_rows": 675,
+    "val_rows": 75,
+    "stratified_by": [
+      "voucher_type",
+      "product_count"
+    ]
+  },
+  "fallback": {
+    "train750_all_train_backup_dir": "dataset/shoppingbench_query_fallback_train750_20260709"
+  },
+  "source_files": {
+    "data/rl_voucher_clean300_synthesize.jsonl": 300,
+    "data/rl_voucher_sample450_synthesize.jsonl": 450
+  },
+  "files": {
+    "queries": "data/rl_voucher_queries_750.jsonl",
+    "meta": "data/rl_voucher_queries_750.meta.jsonl",
+    "train_parquet": "dataset/shoppingbench_query/train.parquet",
+    "val_parquet": "dataset/shoppingbench_query/test.parquet",
+    "product_cache": "dataset/shoppingbench_query/product_cache.json",
+    "prepare_report": "dataset/shoppingbench_query/report.json"
+  },
+  "counts": {
+    "train_parquet_rows": 675,
+    "val_parquet_rows": 75,
+    "total_parquet_rows": 750,
+    "unique_train_queries": 675,
+    "unique_val_queries": 75,
+    "train_val_overlap": 0,
+    "current_sft_unique_queries": 924,
+    "train_sft_overlap": 0,
+    "val_sft_overlap": 0,
+    "reward_product_ids": 2093,
+    "product_cache_entries": 2093,
+    "missing_product_cache_ids": 0,
+    "dropped_overlong_train": 0,
+    "dropped_overlong_val": 0,
+    "max_prompt_tokens_train": 1532,
+    "max_prompt_tokens_val": 1500
+  },
+  "distribution": {
+    "train_voucher_type": {
+      "shop": 472,
+      "platform": 203
+    },
+    "val_voucher_type": {
+      "shop": 53,
+      "platform": 22
+    },
+    "train_product_count": {
+      "3": 227,
+      "2": 205,
+      "4": 188,
+      "1": 55
+    },
+    "val_product_count": {
+      "3": 25,
+      "2": 23,
+      "4": 21,
+      "1": 6
+    }
+  },
+  "schema": {
+    "train_columns": [
+      "data_source",
+      "prompt",
+      "ability",
+      "reward_model",
+      "extra_info",
+      "agent_name"
+    ],
+    "val_columns": [
+      "data_source",
+      "prompt",
+      "ability",
+      "reward_model",
+      "extra_info",
+      "agent_name"
+    ]
+  }
+}

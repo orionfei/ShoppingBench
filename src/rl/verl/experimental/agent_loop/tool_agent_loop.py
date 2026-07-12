@@ -219,9 +219,14 @@ class ToolAgentLoop(AgentLoopBase):
             )
 
     @rollout_trace_op
-    async def run(self, messages: list[dict[str, Any]], sampling_params: dict[str, Any]) -> AgentLoopOutput:
+    async def run(
+        self,
+        messages: list[dict[str, Any]],
+        sampling_params: dict[str, Any],
+        trajectory: dict[str, Any] | None = None,
+    ) -> AgentLoopOutput:
         metrics = {}
-        request_id = uuid4().hex
+        request_id = trajectory.get("request_id") if trajectory and trajectory.get("request_id") else uuid4().hex
         system_message = self._system_message(messages)
         query = self._initial_user_query(messages)
         history_messages = [Message(user=query).to_string(USER_ROLES)]
@@ -242,6 +247,7 @@ class ToolAgentLoop(AgentLoopBase):
             generation_sampling_params = self._sampling_params_for_remaining_response(
                 sampling_params,
                 used_response_tokens=len(response_mask),
+                generation_index=assistant_turns,
             )
             if generation_sampling_params is None:
                 break
@@ -453,11 +459,14 @@ class ToolAgentLoop(AgentLoopBase):
         sampling_params: dict[str, Any],
         *,
         used_response_tokens: int,
+        generation_index: int = 0,
     ) -> dict[str, Any] | None:
         remaining = self.response_length - used_response_tokens
         params = dict(sampling_params)
         if remaining <= 0:
             return None
+        if params.get("seed") is not None:
+            params["seed"] = int(params["seed"]) + generation_index
         for key in ("max_tokens", "max_new_tokens"):
             existing = params.get(key)
             params[key] = min(int(existing), remaining) if existing is not None else remaining

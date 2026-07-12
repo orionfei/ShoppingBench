@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="620" viewBox="0 0 1300 620">
+<rect width="100%" height="100%" fill="white"/>
+<title>Length and truncation</title>
+<text x="650.0" y="35.0" font-family="DejaVu Sans, sans-serif" font-size="23" fill="#243447" text-anchor="middle" dominant-baseline="auto">Response length and token-limit truncation</text>
+<rect x="120.5" y="244.7" width="47.3" height="245.3" fill="#2878b5" stroke="none" stroke-width="1"/>
+<rect x="167.7" y="85.0" width="47.3" height="405.0" fill="#e6ab3c" stroke="none" stroke-width="1"/>
+<rect x="215.0" y="85.0" width="47.3" height="405.0" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="203.2" y="512.0" font-family="DejaVu Sans, sans-serif" font-size="9" fill="#243447" text-anchor="middle" dominant-baseline="auto">T0.2/p0.9</text>
+<rect x="356.8" y="247.3" width="47.3" height="242.7" fill="#2878b5" stroke="none" stroke-width="1"/>
+<rect x="404.1" y="85.0" width="47.3" height="405.0" fill="#e6ab3c" stroke="none" stroke-width="1"/>
+<rect x="451.3" y="85.0" width="47.3" height="405.0" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="439.5" y="512.0" font-family="DejaVu Sans, sans-serif" font-size="9" fill="#243447" text-anchor="middle" dominant-baseline="auto">T0.2/p0.95</text>
+<rect x="593.1" y="141.7" width="47.3" height="348.3" fill="#2878b5" stroke="none" stroke-width="1"/>
+<rect x="640.4" y="85.0" width="47.3" height="405.0" fill="#e6ab3c" stroke="none" stroke-width="1"/>
+<rect x="687.7" y="85.0" width="47.3" height="405.0" fill="#d95f5f" stroke="none" stroke-width="1"/>
+<text x="675.8" y="512.0" font-family="DejaVu Sans, sans-serif" font-size="9" fill="#243447" text-anchor="middle" dominant-baseline="auto">T0.6/p0.8</text>
+<text x="85.0" y="65.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="start" dominant-baseline="auto">P50 (blue), P95 (amber), max (red)</text>
+<text x="1087.0" y="57.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Truncation rate</text>
+<polyline points="909.0,85.0 909.0,490.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="909.0,490.0 1265.0,490.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="909.0" y="508.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">0</text>
+<text x="901.0" y="490.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0</text>
+<polyline points="980.2,85.0 980.2,490.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="909.0,409.0 1265.0,409.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="980.2" y="508.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.4</text>
+<text x="901.0" y="409.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.022</text>
+<polyline points="1051.4,85.0 1051.4,490.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="909.0,328.0 1265.0,328.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="1051.4" y="508.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.8</text>
+<text x="901.0" y="328.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.045</text>
+<polyline points="1122.6,85.0 1122.6,490.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="909.0,247.0 1265.0,247.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="1122.6" y="508.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">1.2</text>
+<text x="901.0" y="247.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.067</text>
+<polyline points="1193.8,85.0 1193.8,490.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="909.0,166.0 1265.0,166.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="1193.8" y="508.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">1.6</text>
+<text x="901.0" y="166.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.09</text>
+<polyline points="1265.0,85.0 1265.0,490.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="909.0,85.0 1265.0,85.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="1265.0" y="508.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">2</text>
+<text x="901.0" y="85.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.11</text>
+<polyline points="909.0,85.0 909.0,490.0 1265.0,490.0" fill="none" stroke="#243447" stroke-width="2"/>
+<text x="1087.0" y="533.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">configuration index</text>
+<text x="909.0" y="77.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="start" dominant-baseline="auto">fraction</text>
+<circle cx="909.0" cy="236.9" r="5.0" fill="#d95f5f" stroke="none"/>
+<circle cx="1087.0" cy="152.5" r="5.0" fill="#d95f5f" stroke="none"/>
+<circle cx="1265.0" cy="208.7" r="5.0" fill="#d95f5f" stroke="none"/>
+</svg>

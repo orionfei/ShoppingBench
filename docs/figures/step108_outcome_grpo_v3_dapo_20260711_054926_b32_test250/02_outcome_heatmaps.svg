@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1740" height="570" viewBox="0 0 1740 570">
+<rect width="100%" height="100%" fill="white"/>
+<title>Outcome heatmaps</title>
+<text x="295.0" y="30.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Paper ASR</text>
+<rect x="85.0" y="65.0" width="475.0" height="433.0" fill="#3f1b62" stroke="white" stroke-width="1"/>
+<text x="322.5" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.083</text>
+<text x="77.0" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.2</text>
+<text x="322.5" y="516.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.9</text>
+<text x="322.5" y="536.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">top-p</text>
+<text x="28.0" y="55.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#9aa5af" text-anchor="start" dominant-baseline="auto">temperature</text>
+<text x="865.0" y="30.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Terminal ASR</text>
+<rect x="655.0" y="65.0" width="475.0" height="433.0" fill="#3f1b62" stroke="white" stroke-width="1"/>
+<text x="892.5" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.083</text>
+<text x="647.0" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.2</text>
+<text x="892.5" y="516.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.9</text>
+<text x="892.5" y="536.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">top-p</text>
+<text x="598.0" y="55.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#9aa5af" text-anchor="start" dominant-baseline="auto">temperature</text>
+<text x="1435.0" y="30.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Terminal pass@G</text>
+<rect x="1225.0" y="65.0" width="475.0" height="433.0" fill="#383f77" stroke="white" stroke-width="1"/>
+<text x="1462.5" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="white" text-anchor="middle" dominant-baseline="middle">0.202</text>
+<text x="1217.0" y="281.5" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="end" dominant-baseline="auto">0.2</text>
+<text x="1462.5" y="516.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">0.9</text>
+<text x="1462.5" y="536.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">top-p</text>
+<text x="1168.0" y="55.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#9aa5af" text-anchor="start" dominant-baseline="auto">temperature</text>
+</svg>

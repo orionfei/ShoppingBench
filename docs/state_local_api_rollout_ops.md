@@ -206,7 +206,7 @@ Use this pattern for the remote API endpoint used in earlier experiments:
 
 ```bash
 export REMOTE_BASE_URL="http://35.220.164.252:3888/v1"
-export REMOTE_API_KEY="sk-EpDBDvpMNPAsgAFs1WuYZOLr0XoWSouLm5nxxOAHegUZBHhS"
+export REMOTE_API_KEY="<YOUR_API_KEY>"
 ```
 
 Important: bypass the environment proxy for this host, otherwise Python/OpenAI

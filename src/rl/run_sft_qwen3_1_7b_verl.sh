@@ -59,6 +59,7 @@ fi
   data.multiturn.enable=True \
   data.multiturn.messages_key=messages \
   data.multiturn.enable_thinking_key=enable_thinking \
+  data.multiturn.assistant_loss_mask_key=assistant_loss_mask \
   model.partial_pretrain="$MODEL_PATH" \
   model.trust_remote_code=True \
   model.fsdp_config.model_dtype="$MODEL_DTYPE" \

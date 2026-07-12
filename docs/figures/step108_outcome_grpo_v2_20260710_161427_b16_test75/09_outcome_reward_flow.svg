@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="430" viewBox="0 0 1500 430">
+<rect width="100%" height="100%" fill="white"/>
+<title>Paper ASR to GRPO advantage</title>
+<text x="750.0" y="35.0" font-family="DejaVu Sans, sans-serif" font-size="23" fill="#243447" text-anchor="middle" dominant-baseline="auto">Outcome-only reward path (G=8)</text>
+<rect x="35.0" y="125.0" width="285.0" height="150.0" fill="#e8f1f8" stroke="#243447" stroke-width="2"/>
+<text x="177.5" y="160.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Official evaluator</text>
+<text x="177.5" y="203.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">rule == 1 AND budget == 1</text>
+<text x="177.5" y="240.0" font-family="DejaVu Sans, sans-serif" font-size="14" fill="#2878b5" text-anchor="middle" dominant-baseline="auto">paper_asr ∈ {0,1}</text>
+<rect x="405.0" y="125.0" width="285.0" height="150.0" fill="#f9edcf" stroke="#243447" stroke-width="2"/>
+<text x="547.5" y="160.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Terminate gate</text>
+<text x="547.5" y="203.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">terminate(status=success)</text>
+<text x="547.5" y="240.0" font-family="DejaVu Sans, sans-serif" font-size="14" fill="#2878b5" text-anchor="middle" dominant-baseline="auto">terminate_success ∈ {0,1}</text>
+<rect x="775.0" y="125.0" width="285.0" height="150.0" fill="#e2f2e9" stroke="#243447" stroke-width="2"/>
+<text x="917.5" y="160.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Training outcome</text>
+<text x="917.5" y="203.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">paper_asr × terminate_success</text>
+<text x="917.5" y="240.0" font-family="DejaVu Sans, sans-serif" font-size="14" fill="#2878b5" text-anchor="middle" dominant-baseline="auto">terminal_asr = score</text>
+<rect x="1145.0" y="125.0" width="285.0" height="150.0" fill="#eee8f7" stroke="#243447" stroke-width="2"/>
+<text x="1287.5" y="160.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">Within-query GRPO</text>
+<text x="1287.5" y="203.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">standardize 8 binary outcomes</text>
+<text x="1287.5" y="240.0" font-family="DejaVu Sans, sans-serif" font-size="14" fill="#2878b5" text-anchor="middle" dominant-baseline="auto">mixed group → ± advantage</text>
+<polyline points="332.0,200.0 380.0,200.0" fill="none" stroke="#243447" stroke-width="3"/>
+<text x="391.0" y="200.0" font-family="DejaVu Sans, sans-serif" font-size="20" fill="#243447" text-anchor="middle" dominant-baseline="middle">▶</text>
+<polyline points="702.0,200.0 750.0,200.0" fill="none" stroke="#243447" stroke-width="3"/>
+<text x="761.0" y="200.0" font-family="DejaVu Sans, sans-serif" font-size="20" fill="#243447" text-anchor="middle" dominant-baseline="middle">▶</text>
+<polyline points="1072.0,200.0 1120.0,200.0" fill="none" stroke="#243447" stroke-width="3"/>
+<text x="1131.0" y="200.0" font-family="DejaVu Sans, sans-serif" font-size="20" fill="#243447" text-anchor="middle" dominant-baseline="middle">▶</text>
+<text x="750.0" y="330.0" font-family="DejaVu Sans, sans-serif" font-size="16" fill="#243447" text-anchor="middle" dominant-baseline="auto">All-fail / all-success group: advantage = 0    |    Mixed group: positive and negative learning signal</text>
+<text x="750.0" y="370.0" font-family="DejaVu Sans, sans-serif" font-size="14" fill="#d95f5f" text-anchor="middle" dominant-baseline="auto">format, workflow, tokens and errors are diagnostics/safety gates only; they never enter score</text>
+</svg>

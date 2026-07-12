@@ -262,7 +262,14 @@ class AsyncvLLMServer(AsyncServerBase):
             repetition_penalty=1.0,
             max_new_tokens=config.response_length,
         )
+        stable_sampling_config = config.agent.get("stable_sampling", {}) or {}
+        force_generation_config_n1 = (
+            bool(stable_sampling_config.get("enabled", False))
+            and bool(stable_sampling_config.get("force_generation_config_n1", False))
+        )
         for k in config.keys():
+            if force_generation_config_n1 and str(k) == "n":
+                continue
             if hasattr(SamplingParams(), str(k)):
                 kwargs[k] = config.get(k)
         print(f"override_generation_config: {kwargs}")
@@ -274,6 +281,10 @@ class AsyncvLLMServer(AsyncServerBase):
             distributed_executor_backend = ExternalRayDistributedExecutor
         else:
             distributed_executor_backend = None
+
+        engine_kwargs = {}
+        if bool(config.get("apply_max_num_seqs", False)):
+            engine_kwargs["max_num_seqs"] = int(config.max_num_seqs)
 
         engine_args = AsyncEngineArgs(
             model=local_path,
@@ -291,9 +302,10 @@ class AsyncvLLMServer(AsyncServerBase):
             disable_log_stats=config.disable_log_stats,
             max_num_batched_tokens=max_num_batched_tokens,
             enable_chunked_prefill=config.enable_chunked_prefill,
-            enable_prefix_caching=True,
+            enable_prefix_caching=bool(config.get("enable_prefix_caching", True)),
             trust_remote_code=trust_remote_code,
             seed=config.get("seed", 0),
+            **engine_kwargs,
         )
 
         # init async llm engine

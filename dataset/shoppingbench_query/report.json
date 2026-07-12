@@ -1,0 +1,64 @@
+{
+  "source": "data/rl_voucher_queries_750.jsonl",
+  "meta": "data/rl_voucher_queries_750.meta.jsonl",
+  "prompt_file": "src/agent/prompt/rollout.state_local.md",
+  "system_prompt_chars": 5478,
+  "max_prompt_length": 2048,
+  "product_cache": {
+    "mode": "validate",
+    "path": "dataset/shoppingbench_query/product_cache.json",
+    "checked": true,
+    "product_ids": 2093,
+    "cache_size": 2093,
+    "missing": 0
+  },
+  "source_distribution": {
+    "rows": 750,
+    "voucher_type": {
+      "platform": 225,
+      "shop": 525
+    },
+    "product_count": {
+      "1": 61,
+      "3": 252,
+      "4": 209,
+      "2": 228
+    }
+  },
+  "train": {
+    "rows": 675,
+    "dropped_overlong": 0,
+    "distribution": {
+      "rows": 675,
+      "voucher_type": {
+        "shop": 472,
+        "platform": 203
+      },
+      "product_count": {
+        "3": 227,
+        "2": 205,
+        "4": 188,
+        "1": 55
+      }
+    },
+    "max_prompt_tokens": 1532
+  },
+  "test": {
+    "rows": 75,
+    "dropped_overlong": 0,
+    "distribution": {
+      "rows": 75,
+      "voucher_type": {
+        "platform": 22,
+        "shop": 53
+      },
+      "product_count": {
+        "1": 6,
+        "2": 23,
+        "4": 21,
+        "3": 25
+      }
+    },
+    "max_prompt_tokens": 1500
+  }
+}

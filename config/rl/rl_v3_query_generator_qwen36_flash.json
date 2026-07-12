@@ -1,0 +1,9 @@
+{
+  "model": "qwen3.6-flash",
+  "temperature": 0.35,
+  "top_p": 0.8,
+  "max_completion_tokens": 512,
+  "extra_body": {
+    "enable_thinking": false
+  }
+}

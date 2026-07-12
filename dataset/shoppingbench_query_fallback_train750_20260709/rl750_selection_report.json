@@ -1,0 +1,59 @@
+{
+  "objective": "historical RL 300+450 queries for RL training, excluding current SFT queries",
+  "source_files": {
+    "data/rl_voucher_clean300_synthesize.jsonl": 300,
+    "data/rl_voucher_sample450_synthesize.jsonl": 450
+  },
+  "files": {
+    "queries": "data/rl_voucher_queries_750.jsonl",
+    "meta": "data/rl_voucher_queries_750.meta.jsonl",
+    "train_parquet": "dataset/shoppingbench_query/train.parquet",
+    "test_parquet": "dataset/shoppingbench_query/test.parquet",
+    "product_cache": "dataset/shoppingbench_query/product_cache.json",
+    "prepare_report": "dataset/shoppingbench_query/report.json"
+  },
+  "counts": {
+    "query_jsonl_rows": 750,
+    "unique_query_jsonl": 750,
+    "meta_rows": 750,
+    "train_parquet_rows": 750,
+    "test_parquet_rows": 0,
+    "unique_train_parquet_queries": 750,
+    "current_sft_unique_queries": 924,
+    "sft_overlap": 0,
+    "parquet_matches_jsonl": true,
+    "reward_product_ids": 2093,
+    "product_cache_entries": 2093,
+    "missing_product_cache_ids": 0
+  },
+  "distribution": {
+    "voucher_type": {
+      "platform": 225,
+      "shop": 525
+    },
+    "discount_type": {
+      "percentage": 468,
+      "fixed": 282
+    },
+    "product_count": {
+      "1": 61,
+      "3": 252,
+      "4": 209,
+      "2": 228
+    },
+    "source_file": {
+      "data/rl_voucher_clean300_synthesize.jsonl": 300,
+      "data/rl_voucher_sample450_synthesize.jsonl": 450
+    }
+  },
+  "schema": {
+    "train_columns": [
+      "data_source",
+      "prompt",
+      "ability",
+      "reward_model",
+      "extra_info",
+      "agent_name"
+    ]
+  }
+}

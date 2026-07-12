@@ -57,7 +57,21 @@ class BatchRewardManager:
 
         ground_truths = [item.non_tensor_batch["reward_model"].get("ground_truth", None) for item in data]
         data_sources = data.non_tensor_batch[self.reward_fn_key]
-        extras = data.non_tensor_batch.get("extra_info", [None] * len(data))
+        extras = []
+        for index, item in enumerate(data):
+            extra = dict(item.non_tensor_batch.get("extra_info", {}) or {})
+            if "messages" in item.non_tensor_batch:
+                extra["messages"] = item.non_tensor_batch["messages"]
+            if "__num_turns__" in item.non_tensor_batch:
+                extra["num_turns"] = item.non_tensor_batch["__num_turns__"]
+            if "global_steps" in data.meta_info:
+                extra["global_step"] = data.meta_info["global_steps"]
+            if "total_training_steps" in data.meta_info:
+                extra["total_training_steps"] = data.meta_info["total_training_steps"]
+            response_tokens = int(valid_response_lengths[index].item())
+            extra["response_tokens"] = response_tokens
+            extra["length_truncated"] = response_tokens >= int(response_ids.shape[-1])
+            extras.append(extra)
 
         scores = self.compute_score(
             data_sources=data_sources,

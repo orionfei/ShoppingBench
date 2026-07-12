@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="860" viewBox="0 0 1400 860">
+<rect width="100%" height="100%" fill="white"/>
+<title>Validation outcome learning curves</title>
+<text x="700.0" y="35.0" font-family="DejaVu Sans, sans-serif" font-size="23" fill="#243447" text-anchor="middle" dominant-baseline="auto">Validation outcome learning curves</text>
+<text x="725.0" y="62.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">ASR</text>
+<polyline points="90.0,90.0 90.0,390.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,390.0 1360.0,390.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="90.0" y="408.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">0</text>
+<text x="82.0" y="390.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0</text>
+<polyline points="344.0,90.0 344.0,390.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,330.0 1360.0,330.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="344.0" y="408.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">16</text>
+<text x="82.0" y="330.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.2</text>
+<polyline points="598.0,90.0 598.0,390.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,270.0 1360.0,270.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="598.0" y="408.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">32</text>
+<text x="82.0" y="270.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.4</text>
+<polyline points="852.0,90.0 852.0,390.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,210.0 1360.0,210.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="852.0" y="408.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">48</text>
+<text x="82.0" y="210.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.6</text>
+<polyline points="1106.0,90.0 1106.0,390.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,150.0 1360.0,150.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="1106.0" y="408.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">64</text>
+<text x="82.0" y="150.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.8</text>
+<polyline points="1360.0,90.0 1360.0,390.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,90.0 1360.0,90.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="1360.0" y="408.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">80</text>
+<text x="82.0" y="90.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">1</text>
+<polyline points="90.0,90.0 90.0,390.0 1360.0,390.0" fill="none" stroke="#243447" stroke-width="2"/>
+<text x="725.0" y="433.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">training step</text>
+<text x="90.0" y="82.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="start" dominant-baseline="auto">ASR</text>
+<polyline points="90.0,279.8 248.8,261.1 407.5,263.4 566.2,272.8 725.0,270.5 883.8,265.8 1042.5,265.8 1201.2,277.5 1360.0,263.4" fill="none" stroke="#2878b5" stroke-width="3"/>
+<circle cx="90.0" cy="279.8" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="248.8" cy="261.1" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="407.5" cy="263.4" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="566.2" cy="272.8" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="725.0" cy="270.5" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="883.8" cy="265.8" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="1042.5" cy="265.8" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="1201.2" cy="277.5" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="1360.0" cy="263.4" r="4.0" fill="#2878b5" stroke="none"/>
+<text x="1352.0" y="90.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#2878b5" text-anchor="end" dominant-baseline="auto">terminal ASR</text>
+<polyline points="90.0,279.8 248.8,261.1 407.5,263.4 566.2,272.8 725.0,270.5 883.8,265.8 1042.5,265.8 1201.2,277.5 1360.0,263.4" fill="none" stroke="#d95f5f" stroke-width="3"/>
+<circle cx="90.0" cy="279.8" r="4.0" fill="#d95f5f" stroke="none"/>
+<circle cx="248.8" cy="261.1" r="4.0" fill="#d95f5f" stroke="none"/>
+<circle cx="407.5" cy="263.4" r="4.0" fill="#d95f5f" stroke="none"/>
+<circle cx="566.2" cy="272.8" r="4.0" fill="#d95f5f" stroke="none"/>
+<circle cx="725.0" cy="270.5" r="4.0" fill="#d95f5f" stroke="none"/>
+<circle cx="883.8" cy="265.8" r="4.0" fill="#d95f5f" stroke="none"/>
+<circle cx="1042.5" cy="265.8" r="4.0" fill="#d95f5f" stroke="none"/>
+<circle cx="1201.2" cy="277.5" r="4.0" fill="#d95f5f" stroke="none"/>
+<circle cx="1360.0" cy="263.4" r="4.0" fill="#d95f5f" stroke="none"/>
+<text x="1352.0" y="108.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#d95f5f" text-anchor="end" dominant-baseline="auto">paper ASR</text>
+<polyline points="90.0,183.8 248.8,221.2 407.5,202.5 566.2,202.5 725.0,202.5 883.8,202.5 1042.5,202.5 1201.2,202.5 1360.0,183.8" fill="none" stroke="#45a675" stroke-width="3"/>
+<circle cx="90.0" cy="183.8" r="4.0" fill="#45a675" stroke="none"/>
+<circle cx="248.8" cy="221.2" r="4.0" fill="#45a675" stroke="none"/>
+<circle cx="407.5" cy="202.5" r="4.0" fill="#45a675" stroke="none"/>
+<circle cx="566.2" cy="202.5" r="4.0" fill="#45a675" stroke="none"/>
+<circle cx="725.0" cy="202.5" r="4.0" fill="#45a675" stroke="none"/>
+<circle cx="883.8" cy="202.5" r="4.0" fill="#45a675" stroke="none"/>
+<circle cx="1042.5" cy="202.5" r="4.0" fill="#45a675" stroke="none"/>
+<circle cx="1201.2" cy="202.5" r="4.0" fill="#45a675" stroke="none"/>
+<circle cx="1360.0" cy="183.8" r="4.0" fill="#45a675" stroke="none"/>
+<text x="1352.0" y="126.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#45a675" text-anchor="end" dominant-baseline="auto">pass@8</text>
+<text x="725.0" y="452.0" font-family="DejaVu Sans, sans-serif" font-size="18" fill="#243447" text-anchor="middle" dominant-baseline="auto">mixed group rate</text>
+<polyline points="90.0,480.0 90.0,780.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,780.0 1360.0,780.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="90.0" y="798.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">0</text>
+<text x="82.0" y="780.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0</text>
+<polyline points="344.0,480.0 344.0,780.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,720.0 1360.0,720.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="344.0" y="798.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">16</text>
+<text x="82.0" y="720.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.2</text>
+<polyline points="598.0,480.0 598.0,780.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,660.0 1360.0,660.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="598.0" y="798.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">32</text>
+<text x="82.0" y="660.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.4</text>
+<polyline points="852.0,480.0 852.0,780.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,600.0 1360.0,600.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="852.0" y="798.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">48</text>
+<text x="82.0" y="600.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.6</text>
+<polyline points="1106.0,480.0 1106.0,780.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,540.0 1360.0,540.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="1106.0" y="798.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">64</text>
+<text x="82.0" y="540.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">0.8</text>
+<polyline points="1360.0,480.0 1360.0,780.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<polyline points="90.0,480.0 1360.0,480.0" fill="none" stroke="#d9e1e8" stroke-width="1"/>
+<text x="1360.0" y="798.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="middle" dominant-baseline="auto">80</text>
+<text x="82.0" y="480.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#243447" text-anchor="end" dominant-baseline="auto">1</text>
+<polyline points="90.0,480.0 90.0,780.0 1360.0,780.0" fill="none" stroke="#243447" stroke-width="2"/>
+<text x="725.0" y="823.0" font-family="DejaVu Sans, sans-serif" font-size="13" fill="#243447" text-anchor="middle" dominant-baseline="auto">training step</text>
+<text x="90.0" y="472.0" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#243447" text-anchor="start" dominant-baseline="auto">mixed group rate</text>
+<polyline points="90.0,592.5 248.8,648.8 407.5,611.2 566.2,630.0 725.0,630.0 883.8,630.0 1042.5,630.0 1201.2,611.2 1360.0,611.2" fill="none" stroke="#2878b5" stroke-width="3"/>
+<circle cx="90.0" cy="592.5" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="248.8" cy="648.8" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="407.5" cy="611.2" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="566.2" cy="630.0" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="725.0" cy="630.0" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="883.8" cy="630.0" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="1042.5" cy="630.0" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="1201.2" cy="611.2" r="4.0" fill="#2878b5" stroke="none"/>
+<circle cx="1360.0" cy="611.2" r="4.0" fill="#2878b5" stroke="none"/>
+<text x="1352.0" y="480.0" font-family="DejaVu Sans, sans-serif" font-size="11" fill="#2878b5" text-anchor="end" dominant-baseline="auto">mixed terminal</text>
+</svg>
