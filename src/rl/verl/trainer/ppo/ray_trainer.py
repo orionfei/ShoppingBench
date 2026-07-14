@@ -848,6 +848,7 @@ class RayPPOTrainer:
         self.validation_generations_logger.log(self.config.trainer.logger, samples, self.global_steps)
 
     def _validate(self):
+        validation_started_at = time.perf_counter()
         data_source_lst = []
         reward_extra_infos_dict: dict[str, list] = defaultdict(list)
 
@@ -988,6 +989,18 @@ class RayPPOTrainer:
             metric_dict["val-aux/num_turns/min"] = sample_turns.min()
             metric_dict["val-aux/num_turns/max"] = sample_turns.max()
             metric_dict["val-aux/num_turns/mean"] = sample_turns.mean()
+
+        validation_seconds = time.perf_counter() - validation_started_at
+        metric_dict["timing/validation_seconds"] = validation_seconds
+        metric_dict["timing/validation_trajectories_per_second"] = (
+            len(sample_scores) / validation_seconds if validation_seconds > 0 else 0.0
+        )
+        print(
+            "[validation-timing] "
+            f"trajectories={len(sample_scores)} "
+            f"seconds={validation_seconds:.3f} "
+            f"trajectories_per_second={metric_dict['timing/validation_trajectories_per_second']:.6f}"
+        )
 
         return metric_dict
 

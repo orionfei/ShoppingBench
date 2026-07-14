@@ -38,7 +38,8 @@ clip_ratio_high: 0.2
 # policy loss config
 policy_loss:
 
-  # Loss function mode: vanilla / clip-cov / kl-cov /gpg from https://arxiv.org/abs/2505.22617
+  # Loss function mode: vanilla / gspo / clip-cov / kl-cov / gpg.
+  # GSPO uses sequence-level importance ratios and sequence-level clipping.
   loss_mode: "vanilla"
 
   # Ratio of tokens to be clipped for clip-cov loss

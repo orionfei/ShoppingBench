@@ -1,0 +1,170 @@
+{
+  "comparison": "GSPO versus matched outcome-only DAPO-GRPO",
+  "important_caveat": "GPU count differs (8 versus 4); algorithmic metrics are comparable, wall time is not a pure algorithm comparison.",
+  "baseline_validation": [
+    {
+      "step": 0,
+      "trajectories": 512,
+      "queries": 64,
+      "terminal_asr": 0.330078125,
+      "paper_asr": 0.330078125,
+      "mixed_rate": 0.40625,
+      "terminal_ci95": [
+        0.234375,
+        0.4296875
+      ],
+      "format": 0.9990234375,
+      "workflow_valid": 0.90234375,
+      "truncation": 0.072265625,
+      "response_p50": 7161.0,
+      "response_p95": 10240.0,
+      "response_max": 10240.0,
+      "server_error": 0.0,
+      "json_failure": 0.001953125
+    },
+    {
+      "step": 11,
+      "trajectories": 512,
+      "queries": 64,
+      "terminal_asr": 0.3125,
+      "paper_asr": 0.3125,
+      "mixed_rate": 0.40625,
+      "terminal_ci95": [
+        0.220703125,
+        0.404296875
+      ],
+      "format": 1.0,
+      "workflow_valid": 0.904296875,
+      "truncation": 0.072265625,
+      "response_p50": 8017.0,
+      "response_p95": 10240.0,
+      "response_max": 10240.0,
+      "server_error": 0.0,
+      "json_failure": 0.0
+    },
+    {
+      "step": 23,
+      "trajectories": 512,
+      "queries": 64,
+      "terminal_asr": 0.34765625,
+      "paper_asr": 0.34765625,
+      "mixed_rate": 0.46875,
+      "terminal_ci95": [
+        0.259765625,
+        0.439453125
+      ],
+      "format": 1.0,
+      "workflow_valid": 0.904296875,
+      "truncation": 0.0546875,
+      "response_p50": 6658.0,
+      "response_p95": 10240.0,
+      "response_max": 10240.0,
+      "server_error": 0.0,
+      "json_failure": 0.00390625
+    },
+    {
+      "step": 34,
+      "trajectories": 512,
+      "queries": 64,
+      "terminal_asr": 0.34765625,
+      "paper_asr": 0.34765625,
+      "mixed_rate": 0.484375,
+      "terminal_ci95": [
+        0.2578125,
+        0.4375
+      ],
+      "format": 1.0,
+      "workflow_valid": 0.892578125,
+      "truncation": 0.048828125,
+      "response_p50": 7154.0,
+      "response_p95": 10232.4,
+      "response_max": 10240.0,
+      "server_error": 0.0,
+      "json_failure": 0.0
+    },
+    {
+      "step": 45,
+      "trajectories": 512,
+      "queries": 64,
+      "terminal_asr": 0.33984375,
+      "paper_asr": 0.33984375,
+      "mixed_rate": 0.421875,
+      "terminal_ci95": [
+        0.24609375,
+        0.43359375
+      ],
+      "format": 1.0,
+      "workflow_valid": 0.908203125,
+      "truncation": 0.068359375,
+      "response_p50": 7150.0,
+      "response_p95": 10240.0,
+      "response_max": 10240.0,
+      "server_error": 0.0,
+      "json_failure": 0.001953125
+    }
+  ],
+  "gspo_validation": [
+    {
+      "step": 0,
+      "trajectories": 512,
+      "queries": 64,
+      "terminal_asr": 0.3203125,
+      "paper_asr": 0.3203125,
+      "mixed_rate": 0.515625,
+      "terminal_ci95": [
+        0.23046875,
+        0.41015625
+      ],
+      "format": 1.0,
+      "workflow_valid": 0.912109375,
+      "truncation": 0.068359375,
+      "response_p50": 7585.5,
+      "response_p95": 10240.0,
+      "response_max": 10240.0,
+      "server_error": 0.0,
+      "json_failure": 0.00390625
+    },
+    {
+      "step": 6,
+      "trajectories": 512,
+      "queries": 64,
+      "terminal_asr": 0.322265625,
+      "paper_asr": 0.322265625,
+      "mixed_rate": 0.46875,
+      "terminal_ci95": [
+        0.23828125,
+        0.40629882812499973
+      ],
+      "format": 0.9984375,
+      "workflow_valid": 0.91015625,
+      "truncation": 0.078125,
+      "response_p50": 8132.5,
+      "response_p95": 10240.0,
+      "response_max": 10240.0,
+      "server_error": 0.0,
+      "json_failure": 0.001953125
+    },
+    {
+      "step": 12,
+      "trajectories": 512,
+      "queries": 64,
+      "terminal_asr": 0.337890625,
+      "paper_asr": 0.337890625,
+      "mixed_rate": 0.328125,
+      "terminal_ci95": [
+        0.244140625,
+        0.4375
+      ],
+      "format": 1.0,
+      "workflow_valid": 0.9140625,
+      "truncation": 0.0546875,
+      "response_p50": 7652.0,
+      "response_p95": 10240.0,
+      "response_max": 10240.0,
+      "server_error": 0.0,
+      "json_failure": 0.0
+    }
+  ],
+  "gspo_reused_step0_source": "/root/project/ShoppingBench/rollouts/step108_outcome_gspo_v3_dapo_fast64_20260714_063127/validation/0.jsonl",
+  "gspo_last_step": 12
+}

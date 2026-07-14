@@ -2,6 +2,8 @@ import os
 import sys
 import ujson as json
 import multiprocessing
+from functools import lru_cache
+from threading import Lock
 
 # Pyserini imports optional OpenAI encoders while loading Lucene support.
 # The Lucene search server does not use them, so a placeholder avoids failing
@@ -22,6 +24,8 @@ app = Flask(__name__)
 
 
 CAPACITY = int(os.getenv("SHOPPINGBENCH_SEARCH_CAPACITY", "5000"))
+FILTER_PREFETCH_CAPACITY = int(os.getenv("SHOPPINGBENCH_FILTER_PREFETCH_CAPACITY", "512"))
+CACHE_SIZE = int(os.getenv("SHOPPINGBENCH_SEARCH_CACHE_SIZE", "20000"))
 PAGE_SIZE = 10
 MAX_PAGE = 5
 SEARCH_FIELDS = ["product_id", "shop_id", "title", "price", "service", "sold_count"]
@@ -103,7 +107,7 @@ def is_filter_by_shop_id(product, shop_id):
     return False
 
 
-def search(q, page, shop_id=None, price=None, sort=None, service=None):
+def _search_uncached(q, page, shop_id=None, price=None, sort=None, service=None):
     page = process_page(page)
     price = process_price(price)
     sort = process_sort(sort)
@@ -115,18 +119,30 @@ def search(q, page, shop_id=None, price=None, sort=None, service=None):
     if page is None:
         return products
 
-    # filter by shop_id & price & service
-    hits = searcher.search(q=q, k=CAPACITY, remove_dups=True)
-    for hit in hits:
-        product = json.loads(searcher.doc(hit.docid).raw())["product"]
-        if is_filter_by_shop_id(product, shop_id):
-            continue
-        if is_filter_by_price(product, price):
-            continue
-        if is_filter_by_service(product, service):
-            continue
-        products.append(product)
-        if len(products) >= MAX_PAGE * PAGE_SIZE:
+    # The legacy server always asks Lucene for 5000 hits even though it consumes
+    # only the first 50 matching products.  With no post-filter this is exactly
+    # equivalent to asking for 50.  With filters, try a bounded prefix first and
+    # fall back to the full capacity only when the prefix cannot fill five pages.
+    target = MAX_PAGE * PAGE_SIZE
+    filters_active = bool(shop_id or any(value is not None for value in price) or service)
+    capacities = [min(CAPACITY, FILTER_PREFETCH_CAPACITY)] if filters_active else [min(CAPACITY, target)]
+    if filters_active and capacities[0] < CAPACITY:
+        capacities.append(CAPACITY)
+    for capacity in capacities:
+        products = []
+        hits = searcher.search(q=q, k=capacity, remove_dups=True)
+        for hit in hits:
+            product = json.loads(searcher.doc(hit.docid).raw())["product"]
+            if is_filter_by_shop_id(product, shop_id):
+                continue
+            if is_filter_by_price(product, price):
+                continue
+            if is_filter_by_service(product, service):
+                continue
+            products.append(product)
+            if len(products) >= target:
+                break
+        if len(products) >= target or capacity == CAPACITY:
             break
 
     # sort
@@ -144,6 +160,34 @@ def search(q, page, shop_id=None, price=None, sort=None, service=None):
     return results
 
 
+_cache_lock = Lock()
+_key_locks = {}
+
+
+@lru_cache(maxsize=CACHE_SIZE)
+def _cached_search(q, page, shop_id, price, sort, service):
+    return _search_uncached(q, page, shop_id, price, sort, service)
+
+
+def search(q, page, shop_id=None, price=None, sort=None, service=None):
+    """Cached, single-flight search while allowing distinct queries in parallel."""
+    key = (q, page, shop_id, price, sort, service)
+    with _cache_lock:
+        key_lock = _key_locks.setdefault(key, Lock())
+    with key_lock:
+        result = _cached_search(*key)
+    return result
+
+
+@lru_cache(maxsize=CACHE_SIZE)
+def _product_information(product_id):
+    doc = searcher.doc(product_id)
+    if not doc:
+        return None
+    product = json.loads(doc.raw())["product"]
+    return {k: product[k] for k in INFORMATION_FIELDS}
+
+
 def information(product_ids, delimiter=","):
     results = []
 
@@ -152,11 +196,9 @@ def information(product_ids, delimiter=","):
         return results
 
     for product_id in product_ids:
-        doc = searcher.doc(product_id)
-        if not doc:
-            continue
-        product = json.loads(doc.raw())["product"]
-        results.append({k: product[k] for k in INFORMATION_FIELDS})
+        product = _product_information(product_id)
+        if product is not None:
+            results.append(product)
     return results
 
 
@@ -190,7 +232,7 @@ def view_product_information():
 
 if __name__ == "__main__":
     cores = multiprocessing.cpu_count()
-    threads = max(4, cores)
+    threads = int(os.getenv("SHOPPINGBENCH_SEARCH_THREADS", str(min(64, max(16, cores)))))
 
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "5631"))

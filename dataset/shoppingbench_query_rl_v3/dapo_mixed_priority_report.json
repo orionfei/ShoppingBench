@@ -1,0 +1,15 @@
+{
+  "canonical_train": "dataset/shoppingbench_query_rl_v3/train.parquet",
+  "canonical_rows": 1414,
+  "proposal_output": "dataset/shoppingbench_query_rl_v3/train_dapo_mixed_priority.parquet",
+  "proposal_rows": 845,
+  "query_unique": 845,
+  "raw_dir": "rollouts/step108_outcome_grpo_v3_dapo_20260711_054926/train/raw_dynamic",
+  "raw_groups": 3680,
+  "raw_unique_queries": 1396,
+  "min_mixed_observations": 1,
+  "selected_historical_groups": 2266,
+  "selected_historical_mixed_groups": 1771,
+  "selected_historical_mixed_rate": 0.7815533980582524,
+  "semantics": "proposal distribution only; online G=8 outcome scoring and mixed-group filtering remain required"
+}

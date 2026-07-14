@@ -152,7 +152,7 @@ def monitor_system(
     warned = False
     server_failures = 0
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
         writer.writeheader()
         tick = 0
         while not stop_event.is_set() and process.poll() is None:

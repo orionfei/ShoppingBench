@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "status": "aborted",
+  "termination_reason": "stopped before the first update after search-server saturation was identified",
+  "max_completed_step": 0,
+  "experiment": "step108_outcome_gspo_v3_dapo_fast64_20260714_070821_b64_pilot12",
+  "algorithm": "GSPO with DAPO mixed-group dynamic sampling",
+  "comparison_baseline": "step108_outcome_grpo_v3_dapo_20260711_054926",
+  "checkpoint": "global_step_108",
+  "train_rows": 1414,
+  "proposal_train_rows": 845,
+  "proposal_semantics": "query-unique priority view; canonical train1414 remains unchanged",
+  "validation_rows": 64,
+  "test_rows": 250,
+  "gpus": 8,
+  "group_size": 8,
+  "effective_batch_groups": 64,
+  "generation_batch_groups": 96,
+  "max_generation_batches": 2,
+  "effective_steps": 12,
+  "save_steps": [
+    6,
+    12
+  ],
+  "validation_steps": [
+    6,
+    12
+  ],
+  "agent_workers": 64,
+  "temperature": 0.4,
+  "top_p": 0.95,
+  "validation_temperature": 0.2,
+  "validation_top_p": 0.9,
+  "learning_rate": 1e-06,
+  "sequence_ratio_clip": [
+    0.9997,
+    1.0004
+  ],
+  "clip_epsilon_low": 0.0003,
+  "clip_epsilon_high": 0.0004,
+  "loss_aggregation": "seq-mean-token-mean",
+  "use_kl_loss": false,
+  "reward": "terminal_asr=paper_asr*terminate_success",
+  "run_root": "/root/project/ShoppingBench/rollouts/step108_outcome_gspo_v3_dapo_fast64_20260714_070821",
+  "hashes": {
+    "dataset/shoppingbench_query_rl_v3/train.parquet": "c1d12dcb0c6dc088b381135f6b04633da564d4d039e23daa17cb12b6adb83997",
+    "dataset/shoppingbench_query_rl_v3/train_dapo_mixed_priority.parquet": "3e66db96695f7f7a96a4d6354c1f6ec1e9cdbdf0fc93ed058e88a995e2ed890a",
+    "dataset/shoppingbench_query_rl_v3/dapo_mixed_priority_report.json": "04dec3a2696914ceb3abc85756c598c0a613d375f3a24c789978d979717c8d56",
+    "dataset/shoppingbench_query_rl_v3/validation.parquet": "6f2eca5f0424f544d7ecd89e2fb2cbe55d866ee11f3916c2c7e7096498b046e8",
+    "dataset/shoppingbench_query_rl_v3/test.parquet": "f15d11fdb60d7965d495b6247c759353f29b30befc3a356953940401d07e72d0",
+    "dataset/shoppingbench_query_rl_v3/product_cache.json": "5dbc14d81b5c56ae1fd017fa5dacffbc910b4f4bb8a7e89bf88cfbcf9acf1bc4",
+    "scripts/run_step108_outcome_gspo_v3_dapo_pilot.sh": "9d3025619b30bd771e7fdb232b0a9b1e5eb4f5aa6a847aa3a56c644f8ed0beee",
+    "scripts/run_step108_outcome_gspo_v3_dapo_fast64.sh": "6649ef4ccff93490728505bda85ec2adff75d02de41d193ccb05b98d571ec7c5",
+    "scripts/supervise_step108_outcome_gspo_v3_dapo_pilot.py": "9c704b628695725bcb2f9ac75eba6614f1c188b83bd53145143c069affcb9656",
+    "scripts/reward_shoppingbench_asr_batch.py": "c07efdbf71261f831c1b23a49d18da63bcb470e15fcf0a4a189f0667adce6032",
+    "src/rl/verl/trainer/ppo/core_algos.py": "9e98ed0c1f9de44bbeb5175d0641bd020aa89648358b271234893b5c94e22efa",
+    "src/rl/verl/trainer/ppo/ray_trainer.py": "bd0085170c2a6859206e3fd893fb118bd02fe299e0fa55bb789125ba2c23339d"
+  },
+  "started_unix": 1784012901.0358403
+}

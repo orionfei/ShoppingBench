@@ -105,7 +105,9 @@ def main():
         if rows:
             with (args.output_dir / f"{name}.csv").open("w", newline="") as handle:
                 keys = sorted(set().union(*(row.keys() for row in rows)))
-                writer = csv.DictWriter(handle, fieldnames=keys); writer.writeheader(); writer.writerows(rows)
+                writer = csv.DictWriter(handle, fieldnames=keys, lineterminator="\n")
+                writer.writeheader()
+                writer.writerows(rows)
 
     if validations:
         x = [row["step"] for row in validations]

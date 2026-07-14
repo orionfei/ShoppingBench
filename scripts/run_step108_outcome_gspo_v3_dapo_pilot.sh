@@ -1,0 +1,125 @@
+#!/bin/bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+# Controlled GSPO-vs-GRPO comparison: retain the v3 data, binary outcome
+# reward, DAPO mixed-group sampler, optimizer, and effective batch.  Only the
+# policy objective and its paper-recommended clipping range change.
+export MODEL_PATH="${MODEL_PATH:-checkpoints/shoppingbench-sft/sft_clean924_prefix_len10240_full_3ep_20260709_043231/global_step_108}"
+export TRAIN_FILES="${TRAIN_FILES:-dataset/shoppingbench_query_rl_v3/train.parquet}"
+export VAL_FILES="${VAL_FILES:-dataset/shoppingbench_query_rl_v3/validation.parquet}"
+export SHOPPINGBENCH_PRODUCT_CACHE="${SHOPPINGBENCH_PRODUCT_CACHE:-dataset/shoppingbench_query_rl_v3/product_cache.json}"
+export PROJECT_NAME="shoppingbench-rl-v3-gspo"
+export EXPERIMENT_NAME="${EXPERIMENT_NAME:-step108_outcome_gspo_v3_dapo_b32_pilot23}"
+export TRAIN_SEED="${TRAIN_SEED:-108}"
+
+export NGPUS_PER_NODE=8
+export TRAIN_BATCH_SIZE="${TRAIN_BATCH_SIZE:-32}"
+export GEN_BATCH_SIZE="${GEN_BATCH_SIZE:-32}"
+export DYNAMIC_SAMPLING_ENABLE=True
+export DYNAMIC_SAMPLING_METRIC=terminal_asr
+export MAX_NUM_GEN_BATCHES="${MAX_NUM_GEN_BATCHES:-4}"
+export PPO_MINI_BATCH_SIZE="${PPO_MINI_BATCH_SIZE:-16}"
+export PPO_MICRO_BATCH_SIZE_PER_GPU=1
+export LOG_PROB_MICRO_BATCH_SIZE_PER_GPU=1
+export PPO_MAX_TOKEN_LEN_PER_GPU=12288
+export TOTAL_EPOCHS="${TOTAL_EPOCHS:-9}"
+export TOTAL_TRAINING_STEPS="${TOTAL_TRAINING_STEPS:-23}"
+export SAVE_FREQ=100000
+export TEST_FREQ=100000
+export VAL_BATCH_SIZE="${VAL_BATCH_SIZE:-16}"
+export VAL_BEFORE_TRAIN="${VAL_BEFORE_TRAIN:-True}"
+SAVE_STEPS="${SAVE_STEPS:-[11,23]}"
+VALIDATION_STEPS="${VALIDATION_STEPS:-[11,23]}"
+
+export MAX_PROMPT_LENGTH=2048
+export MAX_RESPONSE_LENGTH=10240
+export ROLLOUT_N=8
+export TRAIN_ROLLOUT_TEMPERATURE=0.4
+export TRAIN_ROLLOUT_TOP_P=0.95
+export VAL_ROLLOUT_TEMPERATURE=0.2
+export VAL_ROLLOUT_TOP_P=0.9
+export ROLLOUT_MAX_MODEL_LEN=12288
+export ROLLOUT_MAX_NUM_BATCHED_TOKENS="${ROLLOUT_MAX_NUM_BATCHED_TOKENS:-12288}"
+export ROLLOUT_MAX_NUM_SEQS="${ROLLOUT_MAX_NUM_SEQS:-8}"
+export ROLLOUT_APPLY_MAX_NUM_SEQS=True
+export ROLLOUT_ENABLE_PREFIX_CACHING=True
+export ROLLOUT_GPU_MEMORY_UTILIZATION="${ROLLOUT_GPU_MEMORY_UTILIZATION:-0.55}"
+export ROLLOUT_TENSOR_MODEL_PARALLEL_SIZE=1
+export ROLLOUT_ENFORCE_EAGER=False
+export ROLLOUT_FREE_CACHE_ENGINE=True
+export ROLLOUT_AGENT_NUM_WORKERS="${ROLLOUT_AGENT_NUM_WORKERS:-16}"
+export MAX_ASSISTANT_TURNS=15
+export MAX_USER_TURNS=15
+
+export STABLE_ROLLOUT_SAMPLING=True
+export STABLE_ROLLOUT_SEED_REQUESTS=True
+export STABLE_ROLLOUT_DETERMINISTIC_REQUEST_ID=True
+export STABLE_ROLLOUT_STABLE_SERVER_ORDER="${STABLE_ROLLOUT_STABLE_SERVER_ORDER:-True}"
+export STABLE_ROLLOUT_STABLE_SERVER_ROUTING="${STABLE_ROLLOUT_STABLE_SERVER_ROUTING:-True}"
+export STABLE_ROLLOUT_SEED_BASE="$TRAIN_SEED"
+export STABLE_ROLLOUT_OFFSET_BASE=0
+export STABLE_ROLLOUT_FORCE_GENERATION_CONFIG_N1=True
+
+export USE_REMOVE_PADDING=True
+export ATTN_IMPLEMENTATION=flash_attention_2
+export ACTOR_OPTIMIZER_OFFLOAD=True
+export ACTOR_OPTIMIZER_FOREACH=false
+export REF_PARAM_OFFLOAD=True
+export ENTROPY_FROM_LOGITS_WITH_CHUNKING=True
+export LEARNING_RATE=1e-6
+export ENTROPY_COEFF=0
+export USE_KL_LOSS=False
+export SHOPPINGBENCH_REWARD_MODE=asr_terminal
+export LOGGER=console
+export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:False"
+export ACTOR_CHECKPOINT_SAVE_CONTENTS="['model','extra']"
+export ACTOR_CHECKPOINT_LOAD_CONTENTS="['model','extra']"
+export ROLLOUT_DATA_DIR="${ROLLOUT_DATA_DIR:-rollouts/${EXPERIMENT_NAME}/train}"
+export VALIDATION_DATA_DIR="${VALIDATION_DATA_DIR:-rollouts/${EXPERIMENT_NAME}/validation}"
+
+if [[ "${DRY_RUN:-0}" == "1" ]]; then
+  cat <<EOF
+GSPO_V3_DAPO_PILOT=1
+TRAIN_ROWS=1414
+VAL_ROWS=64
+TEST_ROWS=250
+NGPUS_PER_NODE=8
+EFFECTIVE_TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE}
+GEN_BATCH_SIZE=${GEN_BATCH_SIZE}
+MAX_NUM_GEN_BATCHES=${MAX_NUM_GEN_BATCHES}
+GROUP_SIZE=8
+TOTAL_EFFECTIVE_STEPS=${TOTAL_TRAINING_STEPS}
+SAVE_STEPS=${SAVE_STEPS}
+VALIDATION_STEPS=0,${VALIDATION_STEPS}
+AGENT_WORKERS=${ROLLOUT_AGENT_NUM_WORKERS}
+POLICY_LOSS=GSPO
+GSPO_SEQUENCE_RATIO_CLIP=[0.9997,1.0004]
+LR=1e-6
+KL_LOSS=False
+EOF
+  exec env DRY_RUN=1 bash src/rl/run_grpo_qwen3_4b_state_folded_a800.sh
+fi
+
+exec bash src/rl/run_grpo_qwen3_4b_state_folded_a800.sh \
+  +data.seed="$TRAIN_SEED" \
+  data.validation_shuffle=False \
+  algorithm.norm_adv_by_std_in_grpo=True \
+  algorithm.use_kl_in_reward=False \
+  actor_rollout_ref.actor.policy_loss.loss_mode=gspo \
+  actor_rollout_ref.actor.clip_ratio=0.0003 \
+  actor_rollout_ref.actor.clip_ratio_low=0.0003 \
+  actor_rollout_ref.actor.clip_ratio_high=0.0004 \
+  actor_rollout_ref.actor.loss_agg_mode=seq-mean-token-mean \
+  actor_rollout_ref.actor.ppo_epochs=1 \
+  actor_rollout_ref.actor.grad_clip=1.0 \
+  actor_rollout_ref.actor.optim.lr_warmup_steps=0 \
+  actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=0.0 \
+  actor_rollout_ref.actor.optim.weight_decay=0.01 \
+  trainer.max_actor_ckpt_to_keep=2 \
+  +trainer.save_steps="$SAVE_STEPS" \
+  +trainer.test_steps="$VALIDATION_STEPS" \
+  trainer.resume_mode=disable \
+  "$@"

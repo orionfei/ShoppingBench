@@ -794,6 +794,69 @@ def compute_policy_loss(
     return pg_loss, pg_clipfrac, ppo_kl, pg_clipfrac_lower
 
 
+@register_policy_loss("gspo")
+def compute_policy_loss_gspo(
+    old_log_prob: torch.Tensor,
+    log_prob: torch.Tensor,
+    advantages: torch.Tensor,
+    response_mask: torch.Tensor,
+    loss_agg_mode: str = "seq-mean-token-mean",
+    config: Optional[AlgoConfig] = None,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Compute the Group Sequence Policy Optimization objective.
+
+    GSPO matches the unit of importance sampling and clipping to the unit of
+    the outcome reward: one complete response.  The sequence importance ratio
+    is the length-normalized geometric mean of the token ratios.  The detached
+    construction below is the GSPO-token formulation from the paper; with the
+    same outcome advantage on every response token it is numerically and
+    gradient-equivalent to the sequence-level GSPO objective, while fitting the
+    existing token-shaped VERL actor interface.
+
+    This is a minimal backport of VERL's registered ``gspo`` loss.  It is only
+    selected when ``actor.policy_loss.loss_mode=gspo``; the existing vanilla
+    GRPO/DAPO path is unchanged.
+    """
+    if config is None:
+        raise ValueError("GSPO requires the actor config to obtain its clipping ranges")
+
+    clip_ratio = config.clip_ratio
+    clip_ratio_low = config.clip_ratio_low if config.clip_ratio_low is not None else clip_ratio
+    clip_ratio_high = config.clip_ratio_high if config.clip_ratio_high is not None else clip_ratio
+
+    log_ratio = log_prob - old_log_prob
+    seq_lengths = response_mask.sum(dim=-1).clamp(min=1)
+    seq_log_ratio = (log_ratio * response_mask).sum(dim=-1) / seq_lengths
+
+    # Preserve the sequence-level value while making every valid token carry
+    # the same sequence-level policy-gradient weight.
+    log_seq_importance_ratio = log_prob - log_prob.detach() + seq_log_ratio.detach().unsqueeze(-1)
+    log_seq_importance_ratio = torch.clamp(log_seq_importance_ratio, max=10.0)
+    seq_importance_ratio = torch.exp(log_seq_importance_ratio)
+
+    pg_losses1 = -advantages * seq_importance_ratio
+    pg_losses2 = -advantages * torch.clamp(
+        seq_importance_ratio, 1 - clip_ratio_low, 1 + clip_ratio_high
+    )
+    pg_losses = torch.maximum(pg_losses1, pg_losses2)
+
+    # GSPO requires equal weighting of responses, regardless of response
+    # length.  Intentionally ignore the caller's token-mean aggregation mode.
+    pg_loss = agg_loss(
+        loss_mat=pg_losses,
+        loss_mask=response_mask,
+        loss_agg_mode="seq-mean-token-mean",
+    )
+    pg_clipfrac = verl_F.masked_mean(torch.gt(pg_losses2, pg_losses1).float(), response_mask)
+    ppo_kl = verl_F.masked_mean(-log_ratio, response_mask)
+
+    # Retain the four-value policy-loss API used by this pinned VERL version.
+    # Standard GSPO reports one sequence clipping fraction rather than the
+    # dual-clip lower statistic used by the vanilla DAPO loss.
+    pg_clipfrac_lower = torch.zeros((), dtype=pg_loss.dtype, device=pg_loss.device)
+    return pg_loss, pg_clipfrac, ppo_kl, pg_clipfrac_lower
+
+
 @register_policy_loss("gpg")
 def compute_policy_loss_gpg(old_log_prob, log_prob, advantages, response_mask, loss_agg_mode="token-mean", config=None):
     """Adapted from
